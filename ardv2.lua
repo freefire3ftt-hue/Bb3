@@ -1,20 +1,18 @@
 --[[
-=====================================================================================================
     BABIS UI — SURVIVE THE HULK (Halloween Shell)
-    Backend em closure para evitar limite de 200 locais.
-=====================================================================================================
+    Backend em closure. Sem auto escape. Auto Punch + Auto Mission + Auto Spin com seletor.
 ]]
 
-local Players          = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService     = game:GetService("TweenService")
-local SoundService     = game:GetService("SoundService")
-local HttpService      = game:GetService("HttpService")
-local RunService       = game:GetService("RunService")
-local TextService      = game:GetService("TextService")
-local Workspace        = game:GetService("Workspace")
-local Debris           = game:GetService("Debris")
-local ReplicatedStorage= game:GetService("ReplicatedStorage")
+local Players           = game:GetService("Players")
+local UserInputService  = game:GetService("UserInputService")
+local TweenService      = game:GetService("TweenService")
+local SoundService      = game:GetService("SoundService")
+local HttpService       = game:GetService("HttpService")
+local RunService        = game:GetService("RunService")
+local TextService       = game:GetService("TextService")
+local Workspace         = game:GetService("Workspace")
+local Debris            = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
@@ -35,8 +33,7 @@ end)
 for _, holder in ipairs({ uiParent, PlayerGui }) do
     for _, n in ipairs({ "BabisUIKitNotif", "MeuRetangulo", "BabisConfirmDialog",
         "BabisKillOverlay", "BabisClimbOverlay", "BabisHulkAlert", "BabisEventLog" }) do
-        local o = holder:FindFirstChild(n)
-        if o then o:Destroy() end
+        local o = holder:FindFirstChild(n); if o then o:Destroy() end
     end
 end
 
@@ -65,51 +62,47 @@ local PREMIUM_TEXT  = "Premium Edition"
 local LOGO_CONFIG   = { width = 155, height = 74.7, posX = -22, posY = -3, rotation = 0.1 }
 
 local DESIGN_W, DESIGN_H = 720, 470
-local HEADER_H   = 60
-local SIDEBAR_W  = 140
-local CORNER     = 20
-local CARD_H     = 42
-local BALL       = 62
+local HEADER_H = 60
+local SIDEBAR_W = 140
+local CORNER = 20
+local CARD_H = 42
+local BALL = 62
 
-local winW, winH           = DESIGN_W, DESIGN_H
-local MIN_W, MIN_H         = 500, 380
-local MAX_W, MAX_H         = DESIGN_W * 2, DESIGN_H * 2
+local winW, winH = DESIGN_W, DESIGN_H
+local MIN_W, MIN_H = 500, 380
+local MAX_W, MAX_H = DESIGN_W*2, DESIGN_H*2
 
-local TEXT       = Color3.fromRGB(240, 232, 242)
-local TEXT_DIM   = Color3.fromRGB(165, 148, 180)
-local TEXT_MUTED = Color3.fromRGB(128, 112, 144)
-local WHITE      = Color3.new(1, 1, 1)
-local BLACK      = Color3.new(0, 0, 0)
-local C_SUCCESS  = Color3.fromRGB(120, 235, 80)
-local C_ERROR    = Color3.fromRGB(235, 70, 70)
-local C_WARN     = Color3.fromRGB(255, 175, 45)
+local TEXT       = Color3.fromRGB(240,232,242)
+local TEXT_DIM   = Color3.fromRGB(165,148,180)
+local TEXT_MUTED = Color3.fromRGB(128,112,144)
+local WHITE      = Color3.new(1,1,1)
+local BLACK      = Color3.new(0,0,0)
+local C_SUCCESS  = Color3.fromRGB(120,235,80)
+local C_ERROR    = Color3.fromRGB(235,70,70)
+local C_WARN     = Color3.fromRGB(255,175,45)
 
-local UI_SHINE   = { Angle = 20, Width = 67, Height = 1.7, Transparency = 0.88, Speed = 1.20, Interval = 3.00 }
-local BALL_SHINE = { Angle = 21, Width = 40, Height = 22,  Transparency = 0.75, Speed = 1.20, Interval = 3.00 }
+local UI_SHINE   = { Angle=20, Width=67, Height=1.7, Transparency=0.88, Speed=1.20, Interval=3.00 }
+local BALL_SHINE = { Angle=21, Width=40, Height=22, Transparency=0.75, Speed=1.20, Interval=3.00 }
 local SHINE_ENABLED = true
 
 local HW = {
-    EMOJI = true, WEBS = true, SPIDER = true, FOG = true, BATS = true,
-    PURPLE = Color3.fromRGB(150, 70, 235),
-    BAT = "\u{1F987}", GHOST = "\u{1F47B}", PUMPKIN = "\u{1F383}", SPIDER_E = "\u{1F577}\u{FE0F}",
-    DECOR_ALPHA = 0.1, decor = nil,
+    EMOJI=true, WEBS=true, SPIDER=true, FOG=true, BATS=true,
+    PURPLE=Color3.fromRGB(150,70,235),
+    BAT="\u{1F987}", GHOST="\u{1F47B}", PUMPKIN="\u{1F383}", SPIDER_E="\u{1F577}\u{FE0F}",
+    DECOR_ALPHA=0.1, decor=nil,
 }
-do
-    local env = genv.BabisUIHalloween
-    if type(env) == "table" then for k, v in pairs(env) do HW[k] = v end end
-end
+do local env=genv.BabisUIHalloween; if type(env)=="table" then for k,v in pairs(env) do HW[k]=v end end end
 
 local DEFAULT_FLING_SPEED = 400
 local FLING_SPIN_MULT     = 30
 
 local alive = true
 local conns = {}
-local function bind(sig, fn) local c = sig:Connect(fn); conns[#conns+1] = c; return c end
-
-local function new(class, props)
-    local o = Instance.new(class); local p
+local function bind(sig,fn) local c=sig:Connect(fn); conns[#conns+1]=c; return c end
+local function new(class,props)
+    local o=Instance.new(class); local p
     if props then for k,v in pairs(props) do if k=="Parent" then p=v else o[k]=v end end end
-    if p then o.Parent = p end
+    if p then o.Parent=p end
     return o
 end
 local function corner(p,r) return new("UICorner",{CornerRadius=UDim.new(0,r),Parent=p}) end
@@ -121,7 +114,6 @@ local function newLabel(parent,text,size,font,color,props)
     if props then for k,v in pairs(props) do l[k]=v end end
     return l
 end
-
 local function playSound(id,vol)
     pcall(function()
         local s=Instance.new("Sound"); s.SoundId=id; s.Volume=vol or 0.35; s.Parent=SoundService
@@ -129,7 +121,6 @@ local function playSound(id,vol)
         Debris:AddItem(s,10)
     end)
 end
-
 local function hsvToRgb(h,s,v)
     h=h%360; local c=v*s; local x=c*(1-math.abs((h/60)%2-1)); local m=v-c; local r,g,b
     if h<60 then r,g,b=c,x,0 elseif h<120 then r,g,b=x,c,0 elseif h<180 then r,g,b=0,c,x
@@ -157,13 +148,12 @@ local ORIGINAL_THEME = derive({
     border=Color3.fromRGB(54,34,70), textActive=Color3.fromRGB(255,130,40),
     bgMain=Color3.fromRGB(10,6,16), bgHeader=Color3.fromRGB(17,10,26), bgCard=Color3.fromRGB(19,11,29),
 })
-
 local function makeTheme(base)
     local glow=Color3.new(math.min(1,base.R*0.5+0.5),math.min(1,base.G*0.5+0.5),math.min(1,base.B*0.5+0.5))
     local border=Color3.new(math.clamp(base.R*0.3+0.05,0,1),math.clamp(base.G*0.3+0.05,0,1),math.clamp(base.B*0.3+0.05,0,1))
     local br=base.R*0.299+base.G*0.587+base.B*0.114
     return derive({
-        accent=base, glow=glow, border=border, textActive=br>0.4 and base or glow,
+        accent=base,glow=glow,border=border,textActive=br>0.4 and base or glow,
         bgMain=Color3.new(0.03+base.R*0.05,0.03+base.G*0.05,0.04+base.B*0.05),
         bgHeader=Color3.new(0.04+base.R*0.06,0.04+base.G*0.06,0.05+base.B*0.06),
         bgCard=Color3.new(0.04+base.R*0.06,0.04+base.G*0.06,0.05+base.B*0.06),
@@ -171,7 +161,7 @@ local function makeTheme(base)
 end
 local function colorMatch(a,b,tol) tol=tol or 0.02; return math.abs(a.R-b.R)<tol and math.abs(a.G-b.G)<tol and math.abs(a.B-b.B)<tol end
 
-local Theme = { c = ORIGINAL_THEME, regs = {} }
+local Theme = { c=ORIGINAL_THEME, regs={} }
 function Theme.reg(inst,fn) Theme.regs[#Theme.regs+1]={inst=inst,fn=fn}; fn(Theme.c,false) end
 function Theme.bind(inst,prop,role)
     Theme.reg(inst,function(c,a) if a then tween(inst,{[prop]=c[role]},0.35,Enum.EasingStyle.Quad) else inst[prop]=c[role] end end)
@@ -179,7 +169,7 @@ end
 
 local setOption
 function Theme.set(color)
-    if typeof(color) ~= "Color3" then return end
+    if typeof(color)~="Color3" then return end
     local newT = colorMatch(color,ORIGINAL_THEME.accent,0.004) and ORIGINAL_THEME or makeTheme(color)
     Theme.c = newT
     if setOption then setOption("theme_color",newT.accent) end
@@ -191,10 +181,7 @@ end
 
 genv.BabisESPColor = genv.BabisESPColor or Color3.fromRGB(230,30,30)
 
-local DEFAULTS = {
-    theme_color = ORIGINAL_THEME.accent, esp_color = genv.BabisESPColor,
-    auto_load_config = false, last_selected_config = "",
-}
+local DEFAULTS = { theme_color=ORIGINAL_THEME.accent, esp_color=genv.BabisESPColor, auto_load_config=false, last_selected_config="" }
 genv.BabisOptions = genv.BabisOptions or {}
 local Options = genv.BabisOptions
 for k,v in pairs(DEFAULTS) do if Options[k]==nil then Options[k]=v end end
@@ -252,7 +239,8 @@ end
 
 local PERSIST_KEYS = {
     "theme_color","esp_color","auto_load_config","last_selected_config",
-    "auto_kill_hulk","fling_predict","fling_speed","auto_panic","auto_collect_rewards",
+    "auto_kill_hulk","fling_predict","fling_speed",
+    "auto_punch","auto_collect_rewards","spin_ability",
     "esp_hulk","esp_hulkbuster","esp_survivor","esp_weapons","esp_ability",
     "esp_vents","esp_cabinet","esp_hulk_chance",
     "inf_stamina","anti_ragdoll","jump_enabled","jump_value","tpwalk_enabled","tp_speed",
@@ -285,7 +273,7 @@ local function deserializeOptions(data)
     return applied
 end
 
--- ========== NOTIFIER ==========
+-- NOTIFIER
 local NOTIF_W = 270
 local Notifier = {}
 do
@@ -324,7 +312,7 @@ do
         local pb = new("Frame", { Size=UDim2.new(1,0,0,2), Position=UDim2.new(0,0,1,-2), BackgroundColor3=Theme.c.border, BorderSizePixel=0, ZIndex=3, Parent=card })
         local prog = new("Frame", { Size=UDim2.new(1,0,1,0), BackgroundColor3=col, BorderSizePixel=0, ZIndex=4, Parent=pb })
         local hit = new("TextButton", { Size=UDim2.new(1,0,1,0), BackgroundTransparency=1, Text="", AutoButtonColor=false, ZIndex=20, Parent=card })
-        local hov = false
+        local hov=false
         hit.MouseEnter:Connect(function() hov=true end)
         hit.MouseLeave:Connect(function() hov=false end)
         hit.MouseButton1Click:Connect(function() dismiss(row) end)
@@ -346,7 +334,7 @@ do
 end
 local function notify(t,m,d,k) Notifier.notify(t,m,d,k) end
 
--- ========== CONFIRM ==========
+-- CONFIRM
 local Confirm = {}
 do
     local cg = new("ScreenGui", { Name="BabisConfirmDialog", ResetOnSpawn=false, IgnoreGuiInset=true, DisplayOrder=900, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, Parent=PlayerGui })
@@ -391,11 +379,11 @@ do
 end
 
 -- ============================================================
--- BACKEND — closure para evitar limite de 200 registradores
+-- BACKEND — closure
 -- ============================================================
 local Game = (function()
 
-local Overlay = { activeKill=nil, activeClimb=nil }
+local Overlay = { activeKill=nil }
 
 local function showKillOverlay(duration)
     duration = duration or 2.0
@@ -422,60 +410,175 @@ local function showKillOverlay(duration)
     task.delay(duration,function() if sg and sg.Parent then sg:Destroy() end; if Overlay.activeKill==sg then Overlay.activeKill=nil end end)
 end
 
-local function showClimbOverlay(duration)
-    duration = duration or 1.2
-    if Overlay.activeClimb and Overlay.activeClimb.Parent then Overlay.activeClimb:Destroy() end
-    local sg = Instance.new("ScreenGui")
-    sg.Name="BabisClimbOverlay"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true
-    sg.DisplayOrder=999997; sg.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; sg.Parent=uiParent
-    Overlay.activeClimb=sg
-    local bg = Instance.new("Frame")
-    bg.Size=UDim2.new(1,0,1,0); bg.BackgroundColor3=Color3.fromRGB(0,0,0)
-    bg.BackgroundTransparency=1; bg.BorderSizePixel=0; bg.Parent=sg
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency=1; lbl.Text="CLIMBING"
-    lbl.TextColor3=Color3.fromRGB(255,112,22); lbl.Font=Enum.Font.GothamBlack
-    lbl.TextSize=44; lbl.TextStrokeTransparency=0; lbl.TextStrokeColor3=Color3.fromRGB(80,30,5)
-    lbl.TextTransparency=1; lbl.Size=UDim2.new(1,0,0,80)
-    lbl.Position=UDim2.new(0.5,0,0.5,-40); lbl.AnchorPoint=Vector2.new(0.5,0.5); lbl.Parent=bg
-    TweenService:Create(bg,TweenInfo.new(0.2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),{BackgroundTransparency=0}):Play()
-    TweenService:Create(lbl,TweenInfo.new(0.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
-    task.delay(math.max(duration-0.35,0.1),function()
-        TweenService:Create(bg,TweenInfo.new(0.35,Enum.EasingStyle.Quint,Enum.EasingDirection.In),{BackgroundTransparency=1}):Play()
-        TweenService:Create(lbl,TweenInfo.new(0.3,Enum.EasingStyle.Quint,Enum.EasingDirection.In),{TextTransparency=1}):Play()
-    end)
-    task.delay(duration,function() if sg and sg.Parent then sg:Destroy() end; if Overlay.activeClimb==sg then Overlay.activeClimb=nil end end)
+-- Remote refs
+local HulkAttack = ReplicatedStorage:FindFirstChild("HulkAttack")
+local HulkSkinSystem = ReplicatedStorage:FindFirstChild("HulkSkinSystem")
+if not HulkSkinSystem then
+    task.spawn(function() HulkSkinSystem = ReplicatedStorage:WaitForChild("HulkSkinSystem", 30) end)
+end
+local function skinRemote(name)
+    if HulkSkinSystem then return HulkSkinSystem:FindFirstChild(name) end
 end
 
-local Rewards = { enabled=false, interval=2, last=0, claimDaily=nil, claimMission=nil,
-    missionIds={"PLAY_HULK","WIN_ROUNDS","SURVIVE_SECONDS"} }
-do
-    local ok, folder = pcall(function() return ReplicatedStorage:WaitForChild("HulkSkinSystem", 10) end)
-    if ok and folder then
-        Rewards.claimDaily = folder:FindFirstChild("ClaimDaily")
-        Rewards.claimMission = folder:FindFirstChild("ClaimMission")
-    end
-end
-local function rewardsCollect()
-    if Rewards.claimDaily then pcall(function() Rewards.claimDaily:InvokeServer() end) end
-    if Rewards.claimMission then
-        for _,mid in ipairs(Rewards.missionIds) do
-            pcall(function() Rewards.claimMission:InvokeServer(mid) end)
-            task.wait(0.3)
+-- Shared state
+local SharedState = { data = nil }
+local function readState()
+    local EmoteSpin = skinRemote("EmoteSpin")
+    if EmoteSpin then
+        local ok, res = pcall(function() return EmoteSpin:InvokeServer() end)
+        if ok and type(res) == "table" and res.Data then
+            SharedState.data = res.Data
+            return res.Data
         end
+    end
+    return nil
+end
+
+-- AutoPunch
+local AutoPunch = { running=false, count=0, rateClock=0, rateCount=0 }
+local function getLocalRoot()
+    local c = LocalPlayer.Character
+    if not c then return nil end
+    return c:FindFirstChild("HumanoidRootPart")
+end
+RunService.RenderStepped:Connect(function(dt)
+    if not AutoPunch.running then
+        if AutoPunch.rateClock > 0 then AutoPunch.rateClock=0; AutoPunch.rateCount=0 end
+        return
+    end
+    if HulkAttack then
+        local root = getLocalRoot()
+        if root then
+            pcall(function() HulkAttack:FireServer(root.CFrame, Vector3.new(0,0,0)) end)
+            AutoPunch.count = AutoPunch.count + 1
+            AutoPunch.rateCount = AutoPunch.rateCount + 1
+        end
+    end
+    AutoPunch.rateClock = AutoPunch.rateClock + dt
+    if AutoPunch.rateClock >= 0.5 then AutoPunch.rateClock = 0; AutoPunch.rateCount = 0 end
+end)
+function AutoPunch.setEnabled(v) AutoPunch.running = v and true or false end
+
+-- SpinSystem
+local SpinSystem = { running=false, target=nil, attempts=0, spent=0, renderUI=nil }
+function SpinSystem.getState() return SharedState.data end
+local function canAffordSpin()
+    local d = SharedState.data
+    if not d then return true end
+    if (d.AbilitySpins or 0) > 0 then return true end
+    return (d.Money or 0) >= (d.AbilitySpinCost or 1000)
+end
+local function stopSpin(reason)
+    if not SpinSystem.running then return end
+    SpinSystem.running = false
+    if SpinSystem.renderUI then pcall(SpinSystem.renderUI) end
+end
+local function startSpin()
+    if not SpinSystem.target then notify("Spin", "Select a MISSING ability first", 2, "error"); return end
+    if not SharedState.data then readState() end
+    local d = SharedState.data
+    if d and d.OwnedAbilities and d.OwnedAbilities[SpinSystem.target] then
+        notify("Spin", SpinSystem.target .. " already owned", 2, "warn"); return
+    end
+    if not canAffordSpin() then notify("Spin", "No spins and no money", 2, "error"); return end
+    SpinSystem.running = true
+    SpinSystem.attempts = 0
+    SpinSystem.spent = 0
+    if SpinSystem.renderUI then pcall(SpinSystem.renderUI) end
+    task.spawn(function()
+        while SpinSystem.running do
+            if not SpinSystem.target then stopSpin("target removed"); break end
+            if not canAffordSpin() then stopSpin("out of money"); break end
+            local d2 = SharedState.data
+            if d2 and d2.OwnedAbilities and d2.OwnedAbilities[SpinSystem.target] then
+                stopSpin("ACQUIRED · " .. SpinSystem.target); break
+            end
+            local AbilitySpin = skinRemote("AbilitySpin")
+            if not AbilitySpin then task.wait(1) else
+                local prev = SharedState.data and SharedState.data.Money or 0
+                local ok, res = pcall(function() return AbilitySpin:InvokeServer() end)
+                if not ok or type(res) ~= "table" then task.wait(1) else
+                    if res.Data then SharedState.data = res.Data end
+                    if res.Success == true then
+                        SpinSystem.attempts = SpinSystem.attempts + 1
+                        local delta = prev - (SharedState.data.Money or prev)
+                        if delta > 0 then SpinSystem.spent = SpinSystem.spent + delta end
+                        if SpinSystem.renderUI then pcall(SpinSystem.renderUI) end
+                        local nowData = SharedState.data
+                        if nowData and nowData.OwnedAbilities and nowData.OwnedAbilities[SpinSystem.target] then
+                            notify("Spin", "★ GOT " .. SpinSystem.target .. " in " .. SpinSystem.attempts .. " spins!", 3, "success")
+                            stopSpin("ACQUIRED · " .. SpinSystem.target)
+                            break
+                        end
+                        task.wait(0.08)
+                    else
+                        local msg = tostring(res.Message or "?"):lower()
+                        if msg:find("lobby") then task.wait(2)
+                        elseif msg:find("money") or msg:find("fund") or msg:find("insufficient") then stopSpin("out of money"); break
+                        else task.wait(1) end
+                    end
+                end
+            end
+        end
+        if SpinSystem.renderUI then pcall(SpinSystem.renderUI) end
+    end)
+end
+function SpinSystem.setEnabled(v) if v then startSpin() else stopSpin("manual") end end
+function SpinSystem.setTarget(name) SpinSystem.target = name end
+function SpinSystem.refresh()
+    readState()
+    if SpinSystem.renderUI then pcall(SpinSystem.renderUI) end
+end
+task.spawn(function()
+    while alive do
+        task.wait(6)
+        if not SpinSystem.running then
+            readState()
+            if SpinSystem.renderUI then pcall(SpinSystem.renderUI) end
+        end
+    end
+end)
+task.delay(1.2, function() pcall(readState) end)
+
+-- Rewards (Auto Mission)
+local Rewards = { enabled=false, interval=2, last=0 }
+local function rewardsCollect()
+    local ClaimMission = skinRemote("ClaimMission")
+    local ClaimDaily = skinRemote("ClaimDaily")
+    if not SharedState.data then readState() end
+    local d = SharedState.data
+    if not d then return end
+    if ClaimMission then
+        local missions = d.Missions or {}
+        local idxs = {}
+        for i, m in pairs(missions) do
+            if m.Completed and not m.Claimed then idxs[#idxs+1] = i end
+        end
+        table.sort(idxs)
+        for _, i in ipairs(idxs) do
+            if not Rewards.enabled then break end
+            local ok, res = pcall(function() return ClaimMission:InvokeServer(i) end)
+            if ok and type(res) == "table" and res.Data then SharedState.data = res.Data end
+            task.wait(0.1)
+        end
+    end
+    if ClaimDaily and SharedState.data and SharedState.data.Daily and SharedState.data.Daily.CanClaim then
+        pcall(function() ClaimDaily:InvokeServer() end)
     end
 end
 RunService.Heartbeat:Connect(function()
     if not Rewards.enabled then return end
-    local now=tick(); if now-Rewards.last<Rewards.interval then return end
-    Rewards.last=now; task.spawn(function() pcall(rewardsCollect) end)
+    local now = tick()
+    if now - Rewards.last < Rewards.interval then return end
+    Rewards.last = now
+    task.spawn(function() pcall(rewardsCollect) end)
 end)
-function Rewards.enable() Rewards.enabled=true; Rewards.last=0; task.spawn(function() pcall(rewardsCollect) end) end
-function Rewards.disable() Rewards.enabled=false end
+function Rewards.enable() Rewards.enabled = true; Rewards.last = 0; task.spawn(function() pcall(rewardsCollect) end) end
+function Rewards.disable() Rewards.enabled = false end
 
-local InfiniteStamina = { enabled=false, runTrack=nil, crawlTouchUntil=0, crawlBtnRef=nil,
-    connBegin=nil, connEnd=nil, sprintBtnRef=nil, sprintWasVisible=true, sprintConn=nil,
-    hulkSprintBtnRef=nil, hulkSprintWasVisible=true, hulkSprintConn=nil,
+-- Infinite Stamina
+local InfiniteStamina = { enabled=false, runTrack=nil, crawlTouchUntil=0, crawlBtnRef=nil, connBegin=nil, connEnd=nil,
+    sprintBtnRef=nil, sprintWasVisible=true, sprintConn=nil, hulkSprintBtnRef=nil, hulkSprintWasVisible=true, hulkSprintConn=nil,
     RUN_ID="rbxassetid://93208526042306", TARGET_SPEED=35, CRAWL_SPEED=12,
     CRAWL_GUI="SurvivorMobileControls", CRAWL_BTN="CrawlButton", SPRINT_BTN="SprintButton",
     HULK_GUI="HulkUI_TouchAbilityActivation", HULK_CLUSTER="ActionCluster", HULK_SPRINT="Sprint" }
@@ -1030,119 +1133,6 @@ function HulkAlert.disable()
     HulkAlert.container=nil; HulkAlert.titleLbl=nil; HulkAlert.infoLbl=nil; HulkAlert.barFill=nil
 end
 
-local Panic = { autoTrigger=false, triggerRadius=45, cooldown=5, topN=10, sampleStep=16, minHulkDist=90,
-    inset=10, offsetY=3, maxYDelta=6, centerBias=1.0, centerRadius=120,
-    points={}, hulkPos=nil, best=nil, lastTP=0, yRange=nil, center=nil }
-local function panicGetChar() return LocalPlayer.Character end
-local function panicGetHrp() local ch=panicGetChar() return ch and ch:FindFirstChild("HumanoidRootPart") end
-local function panicFindFacility()
-    local f=Workspace:FindFirstChild("HulkFacility440x340")
-    if f then return f end
-    for _,d in ipairs(Workspace:GetChildren()) do if d:IsA("Model") and d.Name:lower():match("hulkfacility") then return d end end
-    return nil
-end
-local function panicFindFloors()
-    local fac=panicFindFacility(); if not fac then return nil end
-    local fl=fac:FindFirstChild("Floors"); if not fl then return nil end
-    return {room=fl:FindFirstChild("RoomFloors"),corridor=fl:FindFirstChild("CorridorFloors"),facility=fac}
-end
-local function panicComputeYRange(fac)
-    local mn,mx=math.huge,-math.huge
-    for _,d in ipairs(fac:GetDescendants()) do if d:IsA("BasePart") then mn=math.min(mn,d.Position.Y); mx=math.max(mx,d.Position.Y) end end
-    if mn==math.huge then return nil end
-    return {min=mn,max=mx}
-end
-local function panicComputeCenter(fac)
-    local sum,count=Vector3.zero,0
-    for _,d in ipairs(fac:GetDescendants()) do if d:IsA("BasePart") then sum=sum+d.Position; count=count+1 end end
-    if count==0 then return nil end
-    return sum/count
-end
-local function panicSampleFolder(folder,tag)
-    if not folder then return end
-    local ch=panicGetChar(); local step=Panic.sampleStep; local inset=Panic.inset
-    for _,part in ipairs(folder:GetChildren()) do
-        if part:IsA("BasePart") and not part.Name:lower():match("water") then
-            local topY=part.Position.Y+part.Size.Y*0.5
-            local hX=math.max(part.Size.X*0.5-inset,0)
-            local hZ=math.max(part.Size.Z*0.5-inset,0)
-            for xO=-hX,hX,step do
-                for zO=-hZ,hZ,step do
-                    local ray=Ray.new(Vector3.new(part.Position.X+xO,topY+1,part.Position.Z+zO),Vector3.new(0,-20,0))
-                    local hit,hp=Workspace:FindPartOnRay(ray,ch)
-                    if hit and hp and math.abs(hp.Y-topY)<=Panic.maxYDelta then
-                        Panic.points[#Panic.points+1]={pos=Vector3.new(hp.X,hp.Y+Panic.offsetY,hp.Z),tag=tag}
-                    end
-                end
-            end
-        end
-    end
-end
-local function panicRescan()
-    Panic.points={}
-    local f=panicFindFloors(); if not f then return end
-    Panic.yRange=panicComputeYRange(f.facility)
-    Panic.center=panicComputeCenter(f.facility)
-    panicSampleFolder(f.room,"room"); panicSampleFolder(f.corridor,"corridor")
-end
-local function panicFindHulk()
-    local hrp=panicGetHrp(); if not hrp then return nil end
-    local best,bestD
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p~=LocalPlayer and p.Character and p.Character:GetAttribute("IsHulk") then
-            local h=p.Character:FindFirstChild("HumanoidRootPart")
-            if h then local d=(h.Position-hrp.Position).Magnitude; if not bestD or d<bestD then best,bestD=h,d end end
-        end
-    end
-    return best,bestD
-end
-local function panicPickSafe()
-    if #Panic.points==0 then return nil end
-    local hrp=panicGetHrp(); if not hrp then return nil end
-    local myPos=hrp.Position; local scored={}
-    for _,pt in ipairs(Panic.points) do
-        if not Panic.yRange or (pt.pos.Y>=Panic.yRange.min-5 and pt.pos.Y<=Panic.yRange.max+5) then
-            local hD=Panic.hulkPos and (pt.pos-Panic.hulkPos).Magnitude or 999
-            if hD>=Panic.minHulkDist then
-                local centerBonus=0
-                if Panic.center and Panic.centerRadius>0 then
-                    local distToCenter=(pt.pos-Panic.center).Magnitude
-                    if distToCenter<Panic.centerRadius then centerBonus=(Panic.centerRadius-distToCenter)*Panic.centerBias end
-                end
-                local myPenalty=math.min((pt.pos-myPos).Magnitude,250)*0.05
-                scored[#scored+1]={pt=pt,score=hD+centerBonus-myPenalty}
-            end
-        end
-    end
-    if #scored==0 then
-        for _,pt in ipairs(Panic.points) do
-            local hD=Panic.hulkPos and (pt.pos-Panic.hulkPos).Magnitude or 999
-            scored[#scored+1]={pt=pt,score=hD}
-        end
-    end
-    table.sort(scored,function(a,b) return a.score>b.score end)
-    local topN=math.min(Panic.topN,#scored); if topN==0 then return nil end
-    return scored[math.random(1,topN)].pt
-end
-local function panicDo()
-    if tick()-Panic.lastTP<Panic.cooldown then return false end
-    local pt=panicPickSafe(); if not pt then return false end
-    local ch=panicGetChar(); if not ch then return false end
-    local ok=pcall(function() ch:PivotTo(CFrame.new(pt.pos)) end)
-    if ok then Panic.lastTP=tick(); Panic.best=pt.pos; showClimbOverlay(1.2); return true end
-    return false
-end
-task.spawn(function() task.wait(2); panicRescan() end)
-task.spawn(function() while alive do task.wait(10); if #Panic.points==0 then pcall(panicRescan) end end end)
-task.spawn(function() while alive do task.wait(0.25); local h=panicFindHulk(); Panic.hulkPos=h and h.Position or nil end end)
-RunService.Heartbeat:Connect(function()
-    if not Panic.autoTrigger then return end
-    local _,d=panicFindHulk()
-    if d and d<=Panic.triggerRadius then panicDo() end
-end)
-function Panic.setAuto(v) Panic.autoTrigger=v end
-function Panic.fireManual() return panicDo() end
-
 local function flingTargetCFrame(hulkHrp)
     local char=hulkHrp.Parent
     local torso=char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or char:FindFirstChild("LowerTorso"))
@@ -1349,16 +1339,8 @@ end
 
 local Doors = { enabled=false, invisible=true, noCollide=true, scanInterval=4,
     keywords={"door","gate","exit","porta","entrance","hinge","doorway","portal"}, originals={}, loop=nil, addConn=nil }
-local function doorNameMatches(name)
-    local n=name:lower()
-    for _,kw in ipairs(Doors.keywords) do if n:match(kw) then return true end end
-    return false
-end
-local function doorIsPlayerPart(part)
-    local p=part.Parent
-    while p and p~=Workspace do if p:IsA("Model") and p:FindFirstChildOfClass("Humanoid") then return true end; p=p.Parent end
-    return false
-end
+local function doorNameMatches(name) local n=name:lower(); for _,kw in ipairs(Doors.keywords) do if n:match(kw) then return true end end; return false end
+local function doorIsPlayerPart(part) local p=part.Parent; while p and p~=Workspace do if p:IsA("Model") and p:FindFirstChildOfClass("Humanoid") then return true end; p=p.Parent end; return false end
 local function doorCapture(part) if Doors.originals[part] then return end; Doors.originals[part]={transp=part.Transparency,cc=part.CanCollide,cq=part.CanQuery,ct=part.CanTouch} end
 local function doorApply(part)
     if not part or not part.Parent or not part:IsA("BasePart") then return end
@@ -1393,18 +1375,17 @@ end
 function Doors.disable() Doors.enabled=false; doorRestore() end
 
 return {
-    AutoKill=AutoKill, Fling=Fling, Panic=Panic,
+    AutoKill=AutoKill, Fling=Fling,
     PlayerESP=PlayerESP, ChanceESP=ChanceESP,
     EspVents=EspVents, EspCabinet=EspCabinet,
     AntiDebris=AntiDebris, EventLog=EventLog, HulkAlert=HulkAlert,
     InfiniteStamina=InfiniteStamina, AntiRagdoll=AntiRagdoll,
     PlayerState=PlayerState, applyPlayerState=applyPlayerState,
     Rewards=Rewards, Doors=Doors,
-    showKillOverlay=showKillOverlay, showClimbOverlay=showClimbOverlay,
-    peClearAll=peClearAll,
+    AutoPunch=AutoPunch, SpinSystem=SpinSystem,
+    showKillOverlay=showKillOverlay, peClearAll=peClearAll,
 }
 end)()
--- ==== END BACKEND ====
 
 -- ============================================================
 -- UI
@@ -1441,7 +1422,6 @@ corner(borderFrame,CORNER-1)
 local borderStroke = stroke(borderFrame,Theme.c.border,1.2,0.05); Theme.bind(borderStroke,"Color","border")
 local overlay = new("Frame", { Name="Overlay", Size=UDim2.fromScale(1,1), BackgroundTransparency=1, ZIndex=100, Parent=canvas })
 
--- Decoração Halloween
 do
     if HW.FOG then
         local fog = new("Frame", { Name="Fog", AnchorPoint=Vector2.new(0,1), Position=UDim2.new(0,SIDEBAR_W,1,0), Size=UDim2.new(1,-SIDEBAR_W,0,120), BackgroundColor3=Color3.fromRGB(120,60,185), BorderSizePixel=0, ZIndex=1, Parent=canvas })
@@ -1909,8 +1889,9 @@ local function addButtonRow(parent,order,defs)
     return buttons
 end
 
--- ===== TABS =====
+-- ===== MAIN TAB =====
 local mainPage=pages["Main"]
+
 addSectionHeader(mainPage,"COMBAT",0)
 addToggle(mainPage,"auto_kill_hulk","Auto Kill Hulk",10,function(v) Game.AutoKill.setEnabled(v) end)
 addClickButton(mainPage,"Kill Hulk Button",CLICK_ICON,11,function()
@@ -1932,18 +1913,91 @@ Game.Fling.spinForce=Game.Fling.linearForce*FLING_SPIN_MULT
 Game.AutoKill.burstForce=Game.Fling.linearForce
 Game.AutoKill.burstSpin=Game.Fling.spinForce
 
-addSectionHeader(mainPage,"ESCAPE",20)
-addToggle(mainPage,"auto_panic","Auto Escape",21,function(v) Game.Panic.setAuto(v) end)
-addClickButton(mainPage,"Escape Button",CLICK_ICON,22,function()
-    local ok=Game.Panic.fireManual()
-    notify("Escape",ok and "Teleported" or "No safe spot / cooldown",2,ok and "success" or "warn")
+addSectionHeader(mainPage,"PUNCH",20)
+addToggle(mainPage,"auto_punch","Auto Punch (Hulk)",21,function(v)
+    Game.AutoPunch.setEnabled(v)
+    notify("Auto Punch",v and "ON" or "OFF",2,v and "success" or "info")
 end)
 
 addSectionHeader(mainPage,"REWARDS",30)
-addToggle(mainPage,"auto_collect_rewards","Auto Collect Rewards",31,function(v)
+addToggle(mainPage,"auto_collect_rewards","Auto Mission",31,function(v)
     if v then Game.Rewards.enable() else Game.Rewards.disable() end
+    notify("Auto Mission",v and "Claiming missions" or "Disabled",2,v and "success" or "info")
 end)
 
+addSectionHeader(mainPage,"ABILITY SPIN",40)
+addToggle(mainPage,"spin_ability","Auto Spin Ability",41,function(v)
+    Game.SpinSystem.setEnabled(v)
+    notify("Spin",v and "Hunting target..." or "Stopped",2,v and "success" or "info")
+end)
+
+-- Ability selector card
+do
+    local wrap=new("Frame",{Name="Wrap",Size=UDim2.new(1,0,0,230),BackgroundTransparency=1,LayoutOrder=42,Parent=mainPage})
+    wrap:SetAttribute("Entrance",true)
+    local card=new("Frame",{Name="Card",Size=UDim2.new(1,0,1,0),BackgroundColor3=Theme.c.bgCard,BorderSizePixel=0,ClipsDescendants=true,Parent=wrap})
+    corner(card,10); stroke(card,Theme.c.border,1,0)
+    new("UIGradient",{Rotation=90,Color=ColorSequence.new(WHITE,Color3.fromRGB(212,212,218)),Parent=card})
+    newLabel(card,"Ability Target",13,FONT_STRONG,TEXT,{Size=UDim2.new(1,-90,0,20),Position=UDim2.new(0,16,0,10)})
+    local targetLbl=newLabel(card,"target: NONE — click a MISSING ability",11,FONT_CODE,C_ERROR,{Size=UDim2.new(1,-32,0,16),Position=UDim2.new(0,16,0,32),TextTruncate=Enum.TextTruncate.AtEnd})
+    local list=new("ScrollingFrame",{Size=UDim2.new(1,-20,0,170),Position=UDim2.new(0,10,0,54),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=2,ScrollBarImageColor3=Theme.c.accent,ScrollBarImageTransparency=0.4,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,Parent=card})
+    new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder,Parent=list})
+    local function render()
+        for _,c in ipairs(list:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+        local data=Game.SpinSystem.getState()
+        if not data or not data.OwnedAbilities then
+            newLabel(list,"Loading ability data...",11,FONT_MAIN,TEXT_MUTED,{Size=UDim2.new(1,0,0,32),TextXAlignment=Enum.TextXAlignment.Center})
+            targetLbl.Text="target: NONE — click a MISSING ability"
+            targetLbl.TextColor3=C_ERROR
+            return
+        end
+        local names={}
+        for n in pairs(data.OwnedAbilities) do names[#names+1]=n end
+        table.sort(names)
+        if Game.SpinSystem.target then
+            targetLbl.Text="target: "..Game.SpinSystem.target
+            targetLbl.TextColor3=Theme.c.accent
+        else
+            targetLbl.Text="target: NONE — click a MISSING ability"
+            targetLbl.TextColor3=C_ERROR
+        end
+        if #names==0 then
+            newLabel(list,"No abilities loaded",11,FONT_MAIN,TEXT_MUTED,{Size=UDim2.new(1,0,0,32),TextXAlignment=Enum.TextXAlignment.Center})
+            return
+        end
+        for i,name in ipairs(names) do
+            local owned=data.OwnedAbilities[name]==true
+            local equipped=(data.EquippedAbility==name)
+            local isTarget=(Game.SpinSystem.target==name)
+            local row=new("TextButton",{Size=UDim2.new(1,-4,0,30),BackgroundColor3=isTarget and Theme.c.hover or Theme.c.bgMain,BackgroundTransparency=isTarget and 0 or 0.35,Text="",AutoButtonColor=false,LayoutOrder=i,Parent=list})
+            corner(row,6); stroke(row,isTarget and Theme.c.accent or (owned and C_SUCCESS or Theme.c.border),isTarget and 1.5 or 1,0.3)
+            local dot=new("Frame",{Size=UDim2.fromOffset(8,8),Position=UDim2.new(0,10,0.5,-4),BackgroundColor3=owned and C_SUCCESS or Color3.fromRGB(90,90,100),BorderSizePixel=0,Parent=row})
+            corner(dot,4)
+            newLabel(row,name,11,FONT_STRONG,owned and TEXT or TEXT_MUTED,{Size=UDim2.new(1,-100,1,0),Position=UDim2.new(0,24,0,0),ZIndex=7})
+            local badgeText=equipped and "EQUIPPED" or (owned and "OWNED" or "MISSING")
+            local badgeCol=equipped and Theme.c.accent or (owned and C_SUCCESS or C_ERROR)
+            local badge=new("TextLabel",{Size=UDim2.fromOffset(70,18),Position=UDim2.new(1,-78,0.5,-9),BackgroundColor3=owned and Color3.fromRGB(20,40,25) or Color3.fromRGB(30,20,20),Text=badgeText,TextColor3=badgeCol,Font=FONT_STRONG,TextSize=8,BorderSizePixel=0,Parent=row})
+            corner(badge,4)
+            row.MouseEnter:Connect(function() if not isTarget then tween(row,{BackgroundTransparency=0,BackgroundColor3=Theme.c.hover},0.1) end end)
+            row.MouseLeave:Connect(function() if not isTarget then tween(row,{BackgroundTransparency=0.35,BackgroundColor3=Theme.c.bgMain},0.12) end end)
+            row.MouseButton1Click:Connect(function()
+                if Game.SpinSystem.running then
+                    notify("Spin","Stop the spin before changing target",2,"warn"); return
+                end
+                Game.SpinSystem.setTarget(name)
+                notify("Spin","Target: "..name,2,"info")
+                render()
+            end)
+        end
+    end
+    Game.SpinSystem.renderUI=render
+    task.delay(0.5,function() pcall(render) end)
+    task.spawn(function()
+        while alive do task.wait(6); if list.Parent then pcall(render) end end
+    end)
+end
+
+-- ===== VISUALS TAB =====
 local visualPage=pages["Visuals"]
 addSectionHeader(visualPage,"PLAYER ESP",0)
 addToggle(visualPage,"esp_hulk","ESP Hulk",1,function(v) Game.PlayerESP.setFlag("hulk",v) end)
@@ -1957,6 +2011,7 @@ addToggle(visualPage,"esp_cabinet","ESP Cabinet",12,function(v) if v then Game.E
 addSectionHeader(visualPage,"INTEL",20)
 addToggle(visualPage,"esp_hulk_chance","ESP Hulk Probability + Pity",21,function(v) if v then Game.ChanceESP.enable() else Game.ChanceESP.disable() end end)
 
+-- ===== PLAYERS TAB =====
 local playersPage=pages["Players"]
 addSectionHeader(playersPage,"SURVIVOR",0)
 addToggle(playersPage,"inf_stamina","Infinite Stamina (Survivor)",1,function(v) if v then Game.InfiniteStamina.enable() else Game.InfiniteStamina.disable() end end)
@@ -1974,6 +2029,7 @@ if Options["tp_speed"]==nil then Options["tp_speed"]=3 end
 Game.PlayerState.tpSpeed=Options["tp_speed"] or 3
 Game.PlayerState.speedPower=Options["tpwalk_enabled"]==true
 
+-- ===== MISC TAB =====
 local miscPage=pages["Misc"]
 addSectionHeader(miscPage,"UTILITY",0)
 addToggle(miscPage,"anti_debris","Anti Debris",1,function(v) if v then Game.AntiDebris.enable() else Game.AntiDebris.disable() end end)
@@ -1982,6 +2038,7 @@ addSectionHeader(miscPage,"INTEL",10)
 addToggle(miscPage,"live_event","Live Event",11,function(v) if v then Game.EventLog.enable() else Game.EventLog.disable() end end)
 addToggle(miscPage,"hulk_alert","Hulk Alert",12,function(v) if v then Game.HulkAlert.enable() else Game.HulkAlert.disable() end end)
 
+-- ===== SETTINGS TAB =====
 local settingsPage=pages["Settings"]
 local current_config=tostring(Options.last_selected_config or "")
 local cfgDropdown
@@ -2014,12 +2071,7 @@ Registry["theme_color"]=function(c) Theme.set(c) end
 
 addSectionHeader(settingsPage,"CONFIGURATION",0)
 local nameBox=addTextBox(settingsPage,nil,"Config Name",10,nil,"Enter preset name...")
-cfgDropdown=addDropdown(settingsPage,"Selected Config",11,{
-    header="Configs", getOptions=refreshConfigs,
-    get=function() return current_config end,
-    set=function(name) selectConfig(name) end,
-    empty="No configs found",
-})
+cfgDropdown=addDropdown(settingsPage,"Selected Config",11,{header="Configs",getOptions=refreshConfigs,get=function() return current_config end,set=function(name) selectConfig(name) end,empty="No configs found"})
 addButtonRow(settingsPage,12,{
     {text="Create Config",callback=function()
         local name=ConfigSys.sanitize(nameBox.Text)
@@ -2295,8 +2347,9 @@ local function destroyAll()
     pcall(function() Game.ChanceESP.disable() end)
     pcall(function() Game.AntiDebris.disable() end)
     pcall(function() Game.Rewards.disable() end)
-    pcall(function() Game.Panic.setAuto(false) end)
     pcall(function() Game.AutoKill.setEnabled(false) end)
+    pcall(function() Game.AutoPunch.setEnabled(false) end)
+    pcall(function() Game.SpinSystem.setEnabled(false) end)
     pcall(function() Game.peClearAll() end)
     pcall(function() RunService:UnbindFromRenderStep("BabisAntiRagdoll") end)
     for _,c in ipairs(conns) do pcall(function() c:Disconnect() end) end
@@ -2352,5 +2405,5 @@ if Options.auto_load_config and current_config~="" then
         task.delay(0.9,function() if not alive then return end; local applied=deserializeOptions(data); applyToUI(applied); notify("Config","Auto-Loaded: "..current_config,2,"success") end)
     end
 end
-print("[Babis UI] Halloween + Hulk carregado.")
+print("[Babis UI] Halloween + Hulk + Tools carregado.")
 return true
