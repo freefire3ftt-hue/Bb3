@@ -1,17 +1,23 @@
 --[[
 =====================================================================================================
-    BABIS UI v3.0 — SETTINGS ONLY + SURVIVE THE HULK
+    BABIS UI — SURVIVE THE HULK (Halloween Shell)
 =====================================================================================================
-    Uma aba (Settings), todas as opções do Hulk dentro.
-    Sem webshot cam. Sem decorações. Backend inline.
+    Shell: Halloween UI v2.2 (abas, sidebar, decorações, tema)
+    Backend: PAID v1.0.0 — todas as features do Hulk
+    
+    Conteúdo das abas:
+    • Main     → Auto Collect, Auto Escape, Escape, Auto Kill, Kill Hulk, Kill Predict, Speed Kill
+    • Visuals  → ESP Hulk / Buster / Survivor / Weapons / Vents / Cabinet / Ability / Chance+Pity
+    • Players  → Infinite Stamina, Anti Ragdoll, JumpPower, Speed Power
+    • Misc     → Anti Debris, Remove Doors, Live Event, Hulk Alert
+    • Settings → Configs + aparência (mantido)
 =====================================================================================================
 ]]
-
-print("[Babis] start")
 
 local Players          = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService     = game:GetService("TweenService")
+local SoundService     = game:GetService("SoundService")
 local HttpService      = game:GetService("HttpService")
 local RunService       = game:GetService("RunService")
 local TextService      = game:GetService("TextService")
@@ -38,26 +44,28 @@ pcall(function()
     end
 end)
 
-pcall(function() RunService:UnbindFromRenderStep("BabisAntiRagdoll") end)
-
 for _, holder in ipairs({ uiParent, PlayerGui }) do
-    for _, n in ipairs({
-        "BabisUIKitNotif", "MeuRetangulo", "BabisConfirmDialog",
-        "BabisKillOverlay", "BabisClimbOverlay", "BabisHulkAlert",
-        "BabisEventLog", "BabisIntro", "BabisPanicFloat", "BabisFlingFloat",
-    }) do
+    for _, n in ipairs({ "BabisUIKitNotif", "MeuRetangulo", "BabisConfirmDialog",
+        "BabisKillOverlay", "BabisClimbOverlay", "BabisHulkAlert", "BabisEventLog" }) do
         local o = holder:FindFirstChild(n)
         if o then o:Destroy() end
     end
 end
 
+-- ====================================================================================================
+-- CONSTANTES
+-- ====================================================================================================
 local FONT_MAIN   = Enum.Font.GothamBold
 local FONT_STRONG = Enum.Font.GothamBlack
 local FONT_CODE   = Enum.Font.Code
 
+local SOUND_ENTRY = "rbxassetid://115664835034053"
+local SOUND_TAB   = "rbxassetid://81846276442269"
+local SOUND_NOTIF = "rbxassetid://80944353275990"
+
 local DISCORD_ICON   = "rbxassetid://100770414662869"
 local DISCORD_TINT   = Color3.fromRGB(115, 136, 217)
-local DISCORD_URL    = "https://discord.gg/ZvCwj68e"
+local DISCORD_URL    = "https://discord.gg/gEBbPa5C"
 local CHECK_ICON     = "rbxassetid://111774854328409"
 local LOGO_ICON      = "rbxassetid://88981628950457"
 local LOGO_BALL_ICON = "rbxassetid://78039301847826"
@@ -68,7 +76,7 @@ local MIN_ICON       = "rbxassetid://7734000129"
 local CLOSE_ICON     = "rbxassetid://7743878857"
 
 local SUBTITLE_TEXT = "Survive The Hulk"
-local PREMIUM_TEXT  = "Premium version"
+local PREMIUM_TEXT  = "Premium Edition"
 local LOGO_CONFIG   = { width = 155, height = 74.7, posX = -22, posY = -3, rotation = 0.1 }
 
 local DESIGN_W, DESIGN_H = 720, 470
@@ -82,15 +90,32 @@ local winW, winH           = DESIGN_W, DESIGN_H
 local MIN_W, MIN_H         = 500, 380
 local MAX_W, MAX_H         = DESIGN_W * 2, DESIGN_H * 2
 
-local TEXT       = Color3.fromRGB(230, 230, 235)
-local TEXT_DIM   = Color3.fromRGB(150, 150, 158)
-local TEXT_MUTED = Color3.fromRGB(120, 120, 128)
+local TEXT       = Color3.fromRGB(240, 232, 242)
+local TEXT_DIM   = Color3.fromRGB(165, 148, 180)
+local TEXT_MUTED = Color3.fromRGB(128, 112, 144)
 local WHITE      = Color3.new(1, 1, 1)
 local BLACK      = Color3.new(0, 0, 0)
-local C_SUCCESS  = Color3.fromRGB(80, 220, 120)
-local C_ERROR    = Color3.fromRGB(235, 85, 85)
-local C_WARN     = Color3.fromRGB(255, 190, 60)
-local C_LOCKED   = Color3.fromRGB(90, 90, 100)
+local C_SUCCESS  = Color3.fromRGB(120, 235, 80)
+local C_ERROR    = Color3.fromRGB(235, 70, 70)
+local C_WARN     = Color3.fromRGB(255, 175, 45)
+
+local UI_SHINE   = { Angle = 20, Width = 67, Height = 1.7, Transparency = 0.88, Speed = 1.20, Interval = 3.00 }
+local BALL_SHINE = { Angle = 21, Width = 40, Height = 22,  Transparency = 0.75, Speed = 1.20, Interval = 3.00 }
+local SHINE_ENABLED = true
+
+local HW = {
+    EMOJI = true, WEBS = true, SPIDER = true, FOG = true, BATS = true,
+    PURPLE = Color3.fromRGB(150, 70, 235),
+    BAT = "\u{1F987}", GHOST = "\u{1F47B}", PUMPKIN = "\u{1F383}", SPIDER_E = "\u{1F577}\u{FE0F}",
+    DECOR_ALPHA = 0.1,
+    decor = nil,
+}
+do
+    local env = genv.BabisUIHalloween
+    if type(env) == "table" then
+        for k, v in pairs(env) do HW[k] = v end
+    end
+end
 
 local DEFAULT_FLING_SPEED = 400
 local FLING_SPIN_MULT     = 30
@@ -103,6 +128,9 @@ local function bind(signal, fn)
     return c
 end
 
+-- ====================================================================================================
+-- HELPERS
+-- ====================================================================================================
 local function new(class, props)
     local o = Instance.new(class)
     local parent
@@ -115,17 +143,23 @@ local function new(class, props)
     return o
 end
 
-local function corner(p, r) return new("UICorner", { CornerRadius = UDim.new(0, r), Parent = p }) end
+local function corner(p, r)
+    return new("UICorner", { CornerRadius = UDim.new(0, r), Parent = p })
+end
+
 local function stroke(p, col, th, tr)
     return new("UIStroke", {
         Color = col, Thickness = th or 1, Transparency = tr or 0,
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p,
     })
 end
+
 local function tween(o, props, d, style, dir)
     local t = TweenService:Create(o, TweenInfo.new(d or 0.2, style or Enum.EasingStyle.Quint, dir or Enum.EasingDirection.Out), props)
-    t:Play(); return t
+    t:Play()
+    return t
 end
+
 local function apply(o, props, d, style, dir)
     if d and d > 0 then return tween(o, props, d, style, dir) end
     for k, v in pairs(props) do o[k] = v end
@@ -140,9 +174,17 @@ local function newLabel(parent, text, size, font, color, props)
     return l
 end
 
-local function playSound() end
-
-local function safeWrite(inst, prop, value) inst[prop] = value end
+local function playSound(id, vol)
+    pcall(function()
+        local s = Instance.new("Sound")
+        s.SoundId = id
+        s.Volume = vol or 0.35
+        s.Parent = SoundService
+        s:Play()
+        s.Ended:Connect(function() pcall(function() s:Destroy() end) end)
+        Debris:AddItem(s, 10)
+    end)
+end
 
 local function hsvToRgb(h, s, v)
     h = h % 360
@@ -173,10 +215,23 @@ local function rgbToHsv(c)
 end
 
 local function toHex(c)
-    return string.format("#%02X%02X%02X",
-        math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+    return string.format("#%02X%02X%02X", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
 end
 
+local gui
+
+local function viewport()
+    if gui then
+        local s = gui.AbsoluteSize
+        if s.X >= 50 and s.Y >= 50 then return s end
+    end
+    local cam = Workspace.CurrentCamera
+    return cam and cam.ViewportSize or Vector2.new(1280, 720)
+end
+
+-- ====================================================================================================
+-- TEMA
+-- ====================================================================================================
 local function derive(t)
     t.hover    = t.bgCard:Lerp(WHITE, 0.035)
     t.trackOff = t.bgCard:Lerp(WHITE, 0.08)
@@ -184,13 +239,13 @@ local function derive(t)
 end
 
 local ORIGINAL_THEME = derive({
-    accent     = Color3.fromRGB(74, 158, 255),
-    glow       = Color3.fromRGB(120, 185, 255),
-    border     = Color3.fromRGB(38, 38, 44),
-    textActive = Color3.fromRGB(74, 158, 255),
-    bgMain     = Color3.fromRGB(9, 9, 11),
-    bgHeader   = Color3.fromRGB(13, 13, 16),
-    bgCard     = Color3.fromRGB(13, 13, 16),
+    accent     = Color3.fromRGB(255, 112, 22),
+    glow       = Color3.fromRGB(255, 196, 96),
+    border     = Color3.fromRGB(54, 34, 70),
+    textActive = Color3.fromRGB(255, 130, 40),
+    bgMain     = Color3.fromRGB(10, 6, 16),
+    bgHeader   = Color3.fromRGB(17, 10, 26),
+    bgCard     = Color3.fromRGB(19, 11, 29),
 })
 
 local function makeTheme(base)
@@ -212,38 +267,51 @@ local function colorMatch(c1, c2, tol)
 end
 
 local Theme = { c = ORIGINAL_THEME, regs = {} }
+
 function Theme.reg(inst, fn)
     Theme.regs[#Theme.regs + 1] = { inst = inst, fn = fn }
     fn(Theme.c, false)
 end
+
 function Theme.bind(inst, prop, role)
     Theme.reg(inst, function(c, animate)
-        if animate then tween(inst, { [prop] = c[role] }, 0.35, Enum.EasingStyle.Quad)
-        else inst[prop] = c[role] end
+        if animate then
+            tween(inst, { [prop] = c[role] }, 0.35, Enum.EasingStyle.Quad)
+        else
+            inst[prop] = c[role]
+        end
     end)
 end
 
 local setOption
+
 function Theme.set(color)
     if typeof(color) ~= "Color3" then return end
-    local newT = colorMatch(color, ORIGINAL_THEME.accent, 0.004) and ORIGINAL_THEME or makeTheme(color)
+    local newT
+    if colorMatch(color, ORIGINAL_THEME.accent, 0.004) then newT = ORIGINAL_THEME else newT = makeTheme(color) end
     Theme.c = newT
     if setOption then setOption("theme_color", newT.accent) end
     genv.BabisThemeColor = newT.accent
     for i = #Theme.regs, 1, -1 do
         local r = Theme.regs[i]
-        if r.inst and not r.inst.Parent then table.remove(Theme.regs, i)
-        else pcall(r.fn, newT, true) end
+        if r.inst and not r.inst.Parent then
+            table.remove(Theme.regs, i)
+        else
+            pcall(r.fn, newT, true)
+        end
     end
 end
 
+-- ====================================================================================================
+-- OPCOES + REGISTRY
+-- ====================================================================================================
 genv.BabisESPColor = genv.BabisESPColor or Color3.fromRGB(230, 30, 30)
 
 local DEFAULTS = {
-    theme_color = ORIGINAL_THEME.accent,
-    auto_load_config = false,
+    theme_color          = ORIGINAL_THEME.accent,
+    esp_color            = genv.BabisESPColor,
+    auto_load_config     = false,
     last_selected_config = "",
-    esp_color = genv.BabisESPColor,
 }
 
 genv.BabisOptions = genv.BabisOptions or {}
@@ -256,6 +324,7 @@ if typeof(Options.theme_color) ~= "Color3" then Options.theme_color = DEFAULTS.t
 
 local ChangedEvent = Instance.new("BindableEvent")
 genv.BabisOptionChanged = ChangedEvent.Event
+
 setOption = function(key, value)
     Options[key] = value
     pcall(function() ChangedEvent:Fire(key, value) end)
@@ -263,12 +332,16 @@ end
 
 local Registry = {}
 
+-- ====================================================================================================
+-- SISTEMA DE CONFIGS
+-- ====================================================================================================
 local CFG = { root = "Babis", folder = "Babis/configs", ext = ".json", autoload = "Babis/autoload.txt" }
 local ConfigSys = {}
 
 function ConfigSys.canWrite()
     return type(writefile) == "function" and type(readfile) == "function"
 end
+
 function ConfigSys.ensure()
     if type(isfolder) ~= "function" or type(makefolder) ~= "function" then return end
     pcall(function()
@@ -276,12 +349,14 @@ function ConfigSys.ensure()
         if not isfolder(CFG.folder) then makefolder(CFG.folder) end
     end)
 end
+
 function ConfigSys.sanitize(name)
     name = tostring(name or "")
     name = name:gsub("[%c\\/:*?\"<>|]", "")
     name = name:match("^%s*(.-)%s*$") or ""
     return name:sub(1, 32)
 end
+
 function ConfigSys.list()
     ConfigSys.ensure()
     local out = {}
@@ -295,10 +370,14 @@ function ConfigSys.list()
     table.sort(out)
     return out
 end
+
 function ConfigSys.exists(name)
-    for _, n in ipairs(ConfigSys.list()) do if n:lower() == name:lower() then return true end end
+    for _, n in ipairs(ConfigSys.list()) do
+        if n:lower() == name:lower() then return true end
+    end
     return false
 end
+
 function ConfigSys.save(name, data)
     if not ConfigSys.canWrite() then return false end
     ConfigSys.ensure()
@@ -307,6 +386,7 @@ function ConfigSys.save(name, data)
     if not okEnc then return false end
     return pcall(writefile, CFG.folder .. "/" .. name .. CFG.ext, enc)
 end
+
 function ConfigSys.load(name)
     if type(readfile) ~= "function" then return nil end
     local okR, content = pcall(readfile, CFG.folder .. "/" .. name .. CFG.ext)
@@ -315,15 +395,20 @@ function ConfigSys.load(name)
     if not okD or type(data) ~= "table" then return nil end
     return data
 end
+
 function ConfigSys.delete(name)
     if type(delfile) ~= "function" then return false end
     return pcall(delfile, CFG.folder .. "/" .. name .. CFG.ext)
 end
+
 function ConfigSys.writeAutoload(enabled, name)
     if not ConfigSys.canWrite() then return end
     ConfigSys.ensure()
-    pcall(function() writefile(CFG.autoload, HttpService:JSONEncode({ enabled = enabled == true, config = name or "" })) end)
+    pcall(function()
+        writefile(CFG.autoload, HttpService:JSONEncode({ enabled = enabled == true, config = name or "" }))
+    end)
 end
+
 function ConfigSys.readAutoload()
     if type(readfile) ~= "function" then return nil end
     local ok, content = pcall(readfile, CFG.autoload)
@@ -334,16 +419,14 @@ function ConfigSys.readAutoload()
 end
 
 local PERSIST_KEYS = {
-    "theme_color", "auto_load_config", "last_selected_config",
-    "esp_color", "esp_player",
-    "infinite_stamina", "jump_enabled", "jump_value",
-    "tpwalk_enabled", "tp_speed", "anti_ragdoll",
-    "auto_escape", "auto_kill_hulk", "fling_predict", "fling_speed",
-    "auto_punch",
-    "esp_hulk", "esp_hulkbuster", "esp_survivor", "esp_weapons",
-    "esp_vents", "esp_cabinet", "esp_ability", "esp_hulk_chance",
-    "hulk_alert", "live_event",
-    "anti_debris", "remove_doors", "auto_mission",
+    "theme_color", "esp_color", "auto_load_config", "last_selected_config",
+    "auto_kill_hulk", "fling_predict", "fling_speed",
+    "auto_panic", "auto_collect_rewards",
+    "esp_hulk", "esp_hulkbuster", "esp_survivor", "esp_weapons", "esp_ability",
+    "esp_vents", "esp_cabinet", "esp_hulk_chance",
+    "inf_stamina", "anti_ragdoll",
+    "jump_enabled", "jump_value", "tpwalk_enabled", "tp_speed",
+    "anti_debris", "remove_doors", "live_event", "hulk_alert",
 }
 
 local function serializeOptions()
@@ -354,26 +437,37 @@ local function serializeOptions()
     end
     return safe
 end
+
 local function parseColor(v)
     if type(v) == "table" and type(v.R) == "number" and type(v.G) == "number" and type(v.B) == "number" then
         return Color3.new(math.clamp(v.R, 0, 1), math.clamp(v.G, 0, 1), math.clamp(v.B, 0, 1))
     end
     return nil
 end
+
 local function deserializeOptions(data)
     local applied = {}
     for _, k in ipairs(PERSIST_KEYS) do
         local v = data[k]
         if v ~= nil then
             local good
-            if k == "esp_color" or k == "theme_color" then good = parseColor(v)
-            elseif type(v) == "boolean" or type(v) == "string" or type(v) == "number" then good = v end
-            if good ~= nil then setOption(k, good); applied[k] = true end
+            if k == "esp_color" or k == "theme_color" then
+                good = parseColor(v)
+            elseif type(v) == "boolean" or type(v) == "string" or type(v) == "number" then
+                good = v
+            end
+            if good ~= nil then
+                setOption(k, good)
+                applied[k] = true
+            end
         end
     end
     return applied
 end
 
+-- ====================================================================================================
+-- NOTIFICACOES
+-- ====================================================================================================
 local NOTIF_W = 270
 local Notifier = {}
 do
@@ -392,17 +486,21 @@ do
         HorizontalAlignment = Enum.HorizontalAlignment.Right, Parent = container,
     })
 
-    local order, active = 0, {}
+    local order = 0
+    local active = {}
     local KIND = { success = C_SUCCESS, error = C_ERROR, warn = C_WARN }
 
     local function dismiss(row)
-        if not row or not row.Parent or row:GetAttribute("Dismissing") then return end
+        if not row or not row.Parent then return end
+        if row:GetAttribute("Dismissing") then return end
         row:SetAttribute("Dismissing", true)
         local card = row:FindFirstChild("Card")
         if card then
             tween(card, { Position = UDim2.new(1, NOTIF_W + 40, 0, 0), GroupTransparency = 1 }, 0.34, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
         end
-        task.delay(0.2, function() if row and row.Parent then tween(row, { Size = UDim2.new(1, 0, 0, 0) }, 0.22, Enum.EasingStyle.Quint) end end)
+        task.delay(0.2, function()
+            if row and row.Parent then tween(row, { Size = UDim2.new(1, 0, 0, 0) }, 0.22, Enum.EasingStyle.Quint) end
+        end)
         task.delay(0.5, function() if row and row.Parent then row:Destroy() end end)
     end
 
@@ -411,11 +509,14 @@ do
         message = tostring(message or "")
         duration = tonumber(duration) or 2.5
         order = order + 1
+        playSound(SOUND_NOTIF, 0.5)
 
         local col = KIND[kind or "info"] or Theme.c.accent
         local textW = NOTIF_W - 78
         local msgH = 14
-        pcall(function() msgH = TextService:GetTextSize(message, 11, FONT_MAIN, Vector2.new(textW, 1000)).Y end)
+        pcall(function()
+            msgH = TextService:GetTextSize(message, 11, FONT_MAIN, Vector2.new(textW, 1000)).Y
+        end)
         local height = math.max(58, 14 + 18 + msgH + 16)
 
         local row = new("Frame", { Name = "Row", Size = UDim2.new(1, 0, 0, height), BackgroundTransparency = 1, LayoutOrder = order, Parent = container })
@@ -427,20 +528,31 @@ do
         new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(208, 208, 214)), Parent = card })
 
         local bf = new("Frame", { Size = UDim2.new(1, -2, 1, -2), Position = UDim2.new(0, 1, 0, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = card })
-        corner(bf, 11); stroke(bf, Theme.c.border, 1, 0.05)
+        corner(bf, 11)
+        stroke(bf, Theme.c.border, 1, 0.05)
 
         local bar = new("Frame", { Size = UDim2.new(0, 4, 1, -20), Position = UDim2.new(0, 8, 0, 10), BackgroundColor3 = col, BorderSizePixel = 0, ZIndex = 3, Parent = card })
         corner(bar, 2)
 
-        local iconBg = new("Frame", { Size = UDim2.new(0, 32, 0, 32), Position = UDim2.new(0, 20, 0.5, -16), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 3, Parent = card })
-        corner(iconBg, 16); stroke(iconBg, col, 1, 0.35)
+        local iconBg = new("Frame", {
+            Size = UDim2.new(0, 32, 0, 32), Position = UDim2.new(0, 20, 0.5, -16),
+            BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 3, Parent = card,
+        })
+        corner(iconBg, 16)
+        stroke(iconBg, col, 1, 0.35)
         new("ImageLabel", {
             Size = UDim2.new(0, 18, 0, 18), Position = UDim2.new(0.5, -9, 0.5, -9), BackgroundTransparency = 1,
             Image = BELL_ICON, ImageColor3 = col:Lerp(WHITE, 0.35), ScaleType = Enum.ScaleType.Fit, ZIndex = 4, Parent = iconBg,
         })
 
-        newLabel(card, title, 13, FONT_MAIN, TEXT, { Size = UDim2.new(1, -78, 0, 18), Position = UDim2.new(0, 62, 0, 10), TextTruncate = Enum.TextTruncate.AtEnd })
-        newLabel(card, message, 11, FONT_MAIN, TEXT_DIM, { Size = UDim2.new(1, -78, 0, msgH), Position = UDim2.new(0, 62, 0, 29), TextWrapped = true })
+        newLabel(card, title, 13, FONT_MAIN, TEXT, {
+            Size = UDim2.new(1, -78, 0, 18), Position = UDim2.new(0, 62, 0, 10), TextYAlignment = Enum.TextYAlignment.Top,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+        })
+        newLabel(card, message, 11, FONT_MAIN, TEXT_DIM, {
+            Size = UDim2.new(1, -78, 0, msgH), Position = UDim2.new(0, 62, 0, 29),
+            TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true,
+        })
 
         local progBg = new("Frame", { Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 1, -2), BackgroundColor3 = Theme.c.border, BorderSizePixel = 0, ZIndex = 3, Parent = card })
         local prog = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = col, BorderSizePixel = 0, ZIndex = 4, Parent = progBg })
@@ -451,9 +563,14 @@ do
         hit.MouseLeave:Connect(function() hovering = false end)
         hit.MouseButton1Click:Connect(function() dismiss(row) end)
 
-        for i = #active, 1, -1 do if not active[i].Parent then table.remove(active, i) end end
+        for i = #active, 1, -1 do
+            if not active[i].Parent then table.remove(active, i) end
+        end
         active[#active + 1] = row
-        while #active > 5 do dismiss(active[1]); table.remove(active, 1) end
+        while #active > 5 do
+            dismiss(active[1])
+            table.remove(active, 1)
+        end
 
         tween(card, { Position = UDim2.new(0, 0, 0, 0), GroupTransparency = 0 }, 0.4, Enum.EasingStyle.Back)
 
@@ -462,7 +579,9 @@ do
             local last = os.clock()
             while remaining > 0 and row.Parent and not row:GetAttribute("Dismissing") do
                 task.wait(0.03)
-                local now = os.clock(); local dt = now - last; last = now
+                local now = os.clock()
+                local dt = now - last
+                last = now
                 if not hovering then remaining = remaining - dt end
                 if prog.Parent then prog.Size = UDim2.new(math.max(0, remaining / duration), 0, 1, 0) end
             end
@@ -470,38 +589,63 @@ do
         end)
         return row
     end
+
     function Notifier.destroy() pcall(function() notifGui:Destroy() end) end
 end
 _G.BabisNotify = Notifier.notify
 genv.BabisNotify = Notifier.notify
 local function notify(title, msg, dur, kind) Notifier.notify(title, msg, dur, kind) end
 
+-- ====================================================================================================
+-- DIALOGO DE CONFIRMACAO
+-- ====================================================================================================
 local Confirm = {}
 do
     local cgui = new("ScreenGui", {
         Name = "BabisConfirmDialog", ResetOnSpawn = false, IgnoreGuiInset = true,
         DisplayOrder = 900, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = PlayerGui,
     })
-    local dim = new("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = BLACK, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, BorderSizePixel = 0, Visible = false, Parent = cgui })
-    local panel = new("CanvasGroup", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(250, 150), BackgroundColor3 = Theme.c.bgCard, BorderSizePixel = 0, GroupTransparency = 1, Visible = false, Parent = cgui })
+    local dim = new("TextButton", {
+        Size = UDim2.fromScale(1, 1), BackgroundColor3 = BLACK, BackgroundTransparency = 1, Text = "",
+        AutoButtonColor = false, BorderSizePixel = 0, Visible = false, Parent = cgui,
+    })
+    local panel = new("CanvasGroup", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(250, 150),
+        BackgroundColor3 = Theme.c.bgCard, BorderSizePixel = 0, GroupTransparency = 1, Visible = false, Parent = cgui,
+    })
     corner(panel, 14)
     local pScale = new("UIScale", { Scale = 0.85, Parent = panel })
     new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(205, 205, 212)), Parent = panel })
     local pb = new("Frame", { Size = UDim2.new(1, -2, 1, -2), Position = UDim2.new(0, 1, 0, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = panel })
-    corner(pb, 13); stroke(pb, Theme.c.border, 1.2, 0)
+    corner(pb, 13)
+    stroke(pb, Theme.c.border, 1.2, 0)
 
-    newLabel(panel, "HE IS SURE?", 19, FONT_STRONG, TEXT, { Size = UDim2.new(1, 0, 0, 30), Position = UDim2.new(0, 0, 0, 22), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 2 })
-    local subLbl = newLabel(panel, "", 11, FONT_MAIN, TEXT_MUTED, { Size = UDim2.new(1, -24, 0, 16), Position = UDim2.new(0, 12, 0, 52), TextXAlignment = Enum.TextXAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 2 })
+    local question = newLabel(panel, "ARE YOU SURE?", 19, FONT_STRONG, TEXT, {
+        Size = UDim2.new(1, 0, 0, 30), Position = UDim2.new(0, 0, 0, 22), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 2,
+    })
+    local subLbl = newLabel(panel, "", 11, FONT_MAIN, TEXT_MUTED, {
+        Size = UDim2.new(1, -24, 0, 16), Position = UDim2.new(0, 12, 0, 52), TextXAlignment = Enum.TextXAlignment.Center,
+        TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 2,
+    })
 
     local btnRow = new("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -16), Size = UDim2.fromOffset(176, 40), BackgroundTransparency = 1, ZIndex = 3, Parent = panel })
     new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 12), HorizontalAlignment = Enum.HorizontalAlignment.Center, Parent = btnRow })
 
     local function mkBtn(text, size, color, order)
-        local b = new("TextButton", { LayoutOrder = order, Size = UDim2.fromOffset(82, 40), BackgroundColor3 = Theme.c.bgMain, Text = text, Font = FONT_STRONG, TextSize = size, TextColor3 = color, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3, Parent = btnRow })
+        local b = new("TextButton", {
+            LayoutOrder = order, Size = UDim2.fromOffset(82, 40), BackgroundColor3 = Theme.c.bgMain, Text = text, Font = FONT_STRONG,
+            TextSize = size, TextColor3 = color, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 3, Parent = btnRow,
+        })
         corner(b, 10)
         local s = stroke(b, Theme.c.border, 1, 0)
-        b.MouseEnter:Connect(function() tween(b, { BackgroundColor3 = Theme.c.hover }, 0.12); tween(s, { Color = color }, 0.12) end)
-        b.MouseLeave:Connect(function() tween(b, { BackgroundColor3 = Theme.c.bgMain }, 0.15); tween(s, { Color = Theme.c.border }, 0.15) end)
+        b.MouseEnter:Connect(function()
+            tween(b, { BackgroundColor3 = Theme.c.hover }, 0.12)
+            tween(s, { Color = color }, 0.12)
+        end)
+        b.MouseLeave:Connect(function()
+            tween(b, { BackgroundColor3 = Theme.c.bgMain }, 0.15)
+            tween(s, { Color = Theme.c.border }, 0.15)
+        end)
         return b
     end
     local noBtn  = mkBtn("✕", 18, C_ERROR, 1)
@@ -509,696 +653,86 @@ do
 
     local isOpen, onYes, onNo = false, nil, nil
     local token = 0
+
     local function hide()
         if not isOpen then return end
-        isOpen = false; token = token + 1
+        isOpen = false
+        token = token + 1
         tween(dim, { BackgroundTransparency = 1 }, 0.18)
         tween(panel, { GroupTransparency = 1 }, 0.16)
         tween(pScale, { Scale = 0.88 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
         local my = token
-        task.delay(0.2, function() if token == my and cgui.Parent then dim.Visible = false; panel.Visible = false end end)
+        task.delay(0.2, function()
+            if token == my and cgui.Parent then dim.Visible = false; panel.Visible = false end
+        end)
     end
+
     function Confirm.ask(text, sub, yesFn, noFn)
         onYes, onNo = yesFn, noFn
+        question.Text = text or "ARE YOU SURE?"
         subLbl.Text = sub or ""
-        isOpen = true; token = token + 1
+        yesBtn.TextColor3 = Theme.c.accent
+        isOpen = true
+        token = token + 1
         dim.Visible = true; panel.Visible = true
-        dim.BackgroundTransparency = 1; panel.GroupTransparency = 1; pScale.Scale = 0.85
+        dim.BackgroundTransparency = 1
+        panel.GroupTransparency = 1
+        pScale.Scale = 0.85
         tween(dim, { BackgroundTransparency = 0.5 }, 0.25)
         tween(panel, { GroupTransparency = 0 }, 0.2)
         tween(pScale, { Scale = 1 }, 0.35, Enum.EasingStyle.Back)
+        playSound(SOUND_TAB, 0.4)
     end
-    noBtn.MouseButton1Click:Connect(function() local f = onNo; hide(); if f then f() end end)
-    yesBtn.MouseButton1Click:Connect(function() local f = onYes; hide(); if f then task.delay(0.12, f) end end)
-    dim.MouseButton1Click:Connect(function() local f = onNo; hide(); if f then f() end end)
+
+    noBtn.MouseButton1Click:Connect(function()
+        playSound(SOUND_TAB, 0.35)
+        local f = onNo
+        hide()
+        if f then f() end
+    end)
+    yesBtn.MouseButton1Click:Connect(function()
+        playSound(SOUND_TAB, 0.35)
+        local f = onYes
+        hide()
+        if f then task.delay(0.12, f) end
+    end)
+    dim.MouseButton1Click:Connect(function() noBtn.MouseButton1Click:Fire() end)
+
     bind(UserInputService.InputBegan, function(input)
         if not isOpen then return end
-        if input.KeyCode == Enum.KeyCode.Escape then local f = onNo; hide(); if f then f() end
-        elseif input.KeyCode == Enum.KeyCode.Return then local f = onYes; hide(); if f then task.delay(0.12, f) end end
+        if input.KeyCode == Enum.KeyCode.Escape then
+            local f = onNo
+            hide()
+            if f then f() end
+        elseif input.KeyCode == Enum.KeyCode.Return then
+            local f = onYes
+            hide()
+            if f then task.delay(0.12, f) end
+        end
     end)
+
     function Confirm.destroy() pcall(function() cgui:Destroy() end) end
 end
 
-local gui = new("ScreenGui", {
-    Name = "MeuRetangulo", ResetOnSpawn = false, IgnoreGuiInset = true,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 100, Enabled = true,
-    Parent = PlayerGui,
-})
+-- ====================================================================================================
+-- BACKEND DO HULK (portado do PAID v1.0.0)
+-- ====================================================================================================
 
-local root = new("Frame", { Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(winW, winH), BackgroundTransparency = 1, Parent = gui })
-local fitScale = new("UIScale", { Parent = root })
-
-local function viewport()
-    if gui then local s = gui.AbsoluteSize; if s.X >= 50 and s.Y >= 50 then return s end end
-    local cam = Workspace.CurrentCamera
-    return cam and cam.ViewportSize or Vector2.new(1280, 720)
-end
-
-local function updateFit()
-    local vp = gui.AbsoluteSize
-    if vp.X < 50 or vp.Y < 50 then vp = viewport() end
-    fitScale.Scale = math.clamp(math.min(vp.X * 0.92 / winW, vp.Y * 0.90 / winH), 0.5, 1.25)
-end
-updateFit()
-bind(gui:GetPropertyChangedSignal("AbsoluteSize"), updateFit)
-
-local shadowLayers = {}
-for i = 1, 7 do
-    local s = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 8), Size = UDim2.new(1, i * 7, 1, i * 7), BackgroundColor3 = BLACK, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 0, Parent = root })
-    corner(s, CORNER + i * 3)
-    shadowLayers[i] = s
-end
-local function setShadow(visible, d)
-    for i, s in ipairs(shadowLayers) do
-        apply(s, { BackgroundTransparency = visible and (0.9 + i * 0.0075) or 1 }, d or 0.4, Enum.EasingStyle.Quad)
-    end
-end
-
-local canvas = new("CanvasGroup", { Name = "Canvas", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, GroupTransparency = 1, ZIndex = 1, Parent = root })
-corner(canvas, CORNER); Theme.bind(canvas, "BackgroundColor3", "bgMain")
-local popScale = new("UIScale", { Scale = 0.86, Parent = canvas })
-new("UIGradient", { Rotation = 135, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(208, 208, 218)), Parent = canvas })
-
-local borderFrame = new("Frame", { Name = "Border", Size = UDim2.new(1, -2, 1, -2), Position = UDim2.new(0, 1, 0, 1), BackgroundTransparency = 1, ZIndex = 60, Parent = canvas })
-corner(borderFrame, CORNER - 1)
-local borderStroke = stroke(borderFrame, Theme.c.border, 1.2, 0.05)
-Theme.bind(borderStroke, "Color", "border")
-
-local overlay = new("Frame", { Name = "Overlay", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 100, Parent = canvas })
-
-local grip = new("TextButton", { Name = "ResizeGrip", Size = UDim2.fromOffset(22, 22), AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -4, 1, -4), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 65, Parent = canvas })
-local gripDots = {}
-for _, d in ipairs({ {14,14}, {8,14}, {14,8}, {2,14}, {8,8}, {14,2} }) do
-    local dot = new("Frame", { Size = UDim2.fromOffset(2, 2), Position = UDim2.fromOffset(d[1], d[2]), BackgroundColor3 = TEXT_MUTED, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 66, Parent = grip })
-    corner(dot, 1); gripDots[#gripDots + 1] = dot
-end
-grip.MouseEnter:Connect(function() for _, d in ipairs(gripDots) do tween(d, { BackgroundColor3 = Theme.c.accent, BackgroundTransparency = 0 }, 0.12) end end)
-grip.MouseLeave:Connect(function() for _, d in ipairs(gripDots) do tween(d, { BackgroundColor3 = TEXT_MUTED, BackgroundTransparency = 0.3 }, 0.15) end end)
-
-local function ripple(card, input)
-    local sc = fitScale.Scale
-    local abs = card.AbsolutePosition
-    local size = card.AbsoluteSize
-    local x, y = size.X / sc / 2, size.Y / sc / 2
-    if input and input.Position then x = (input.Position.X - abs.X) / sc; y = (input.Position.Y - abs.Y) / sc end
-    local r = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(0, 0), BackgroundColor3 = WHITE, BackgroundTransparency = 0.82, BorderSizePixel = 0, ZIndex = 2, Parent = card })
-    corner(r, 999)
-    local d = (size.X / sc) * 2.2
-    tween(r, { Size = UDim2.fromOffset(d, d), BackgroundTransparency = 1 }, 0.6, Enum.EasingStyle.Quart)
-    Debris:AddItem(r, 0.7)
-end
-
-local Tooltip = {}
-do
-    local tip = new("TextLabel", { Name = "Tooltip", BackgroundColor3 = Theme.c.bgMain, BackgroundTransparency = 1, TextTransparency = 1, Font = FONT_MAIN, TextSize = 11, TextColor3 = TEXT, Text = "", BorderSizePixel = 0, ZIndex = 200, Size = UDim2.fromOffset(60, 22), AnchorPoint = Vector2.new(0.5, 0), Visible = false, Parent = overlay })
-    corner(tip, 6)
-    local tStroke = stroke(tip, Theme.c.border, 1, 1)
-    local token = 0
-    function Tooltip.show(text, anchor)
-        token = token + 1; local my = token
-        task.delay(0.35, function()
-            if token ~= my or not anchor.Parent then return end
-            local sc = fitScale.Scale
-            local w = 60
-            pcall(function() w = TextService:GetTextSize(text, 11, FONT_MAIN, Vector2.new(400, 30)).X + 18 end)
-            local a, o = anchor.AbsolutePosition, overlay.AbsolutePosition
-            local cx = (a.X - o.X) / sc + anchor.AbsoluteSize.X / sc / 2
-            local y = (a.Y - o.Y) / sc + anchor.AbsoluteSize.Y / sc + 8
-            cx = math.clamp(cx, w / 2 + 6, winW - w / 2 - 6)
-            tip.Text = text; tip.Size = UDim2.fromOffset(w, 22); tip.Position = UDim2.fromOffset(cx, y + 4)
-            tip.BackgroundColor3 = Theme.c.bgMain; tStroke.Color = Theme.c.border
-            tip.Visible = true
-            tween(tip, { Position = UDim2.fromOffset(cx, y), BackgroundTransparency = 0.05, TextTransparency = 0 }, 0.15)
-            tween(tStroke, { Transparency = 0.2 }, 0.15)
-        end)
-    end
-    function Tooltip.hide()
-        token = token + 1
-        tween(tip, { BackgroundTransparency = 1, TextTransparency = 1 }, 0.1)
-        tween(tStroke, { Transparency = 1 }, 0.1)
-        local my = token
-        task.delay(0.12, function() if token == my then tip.Visible = false end end)
-    end
-end
-
-local Popup = { current = nil }
-function Popup.close()
-    local cur = Popup.current; if not cur then return end
-    Popup.current = nil
-    if cur.arrow and cur.arrow.Parent then tween(cur.arrow, { Rotation = 0 }, 0.2) end
-    pcall(function() cur.backdrop:Destroy() end)
-    local f = cur.frame
-    if f and f.Parent then tween(f, { Size = UDim2.new(0, cur.w, 0, 0) }, 0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.In); Debris:AddItem(f, 0.2) end
-end
-function Popup.open(anchor, spec)
-    if Popup.current and Popup.current.anchor == anchor then Popup.close(); return end
-    Popup.close(); Tooltip.hide()
-    local c = Theme.c
-    local sc = fitScale.Scale
-    local aAbs, aSize, oAbs = anchor.AbsolutePosition, anchor.AbsoluteSize, overlay.AbsolutePosition
-    local aw, ah = aSize.X / sc, aSize.Y / sc
-    local ax, ay = (aAbs.X - oAbs.X) / sc, (aAbs.Y - oAbs.Y) / sc
-    local options = spec.options or {}
-    local ROW_H, GAP, HEAD_H, PAD = 26, 2, 22, 6
-    local rows = math.max(#options, 1)
-    local visible = math.min(rows, 6)
-    local listH = visible * (ROW_H + GAP) - GAP
-    local totalH = PAD + HEAD_H + 5 + listH + PAD
-    local totalW = math.max(aw, 156)
-    local px = math.clamp(ax + aw - totalW, 8, winW - totalW - 8)
-    local spaceBelow = winH - (ay + ah) - 12
-    local spaceAbove = ay - 12
-    local openUp = spaceBelow < totalH and spaceAbove > spaceBelow
-
-    local backdrop = new("TextButton", { Name = "PopupBackdrop", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 1, Parent = overlay })
-    backdrop.MouseButton1Click:Connect(Popup.close)
-
-    local pf = new("Frame", { Name = "Popup", BackgroundColor3 = c.bgCard, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 5, Size = UDim2.new(0, totalW, 0, 0), Parent = overlay })
-    corner(pf, 10); stroke(pf, c.accent, 1.2, 0.45)
-    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(205, 205, 212)), Parent = pf })
-    if openUp then pf.AnchorPoint = Vector2.new(0, 1); pf.Position = UDim2.fromOffset(px, ay - 6)
-    else pf.AnchorPoint = Vector2.new(0, 0); pf.Position = UDim2.fromOffset(px, ay + ah + 6) end
-
-    newLabel(pf, spec.header or "Options", 10, FONT_STRONG, TEXT_DIM, { Size = UDim2.new(1, -20, 0, HEAD_H), Position = UDim2.new(0, 12, 0, PAD), ZIndex = 6 })
-    new("Frame", { Size = UDim2.new(1, -20, 0, 1), Position = UDim2.new(0, 10, 0, PAD + HEAD_H + 1), BackgroundColor3 = c.border, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 6, Parent = pf })
-
-    local list = new("ScrollingFrame", { Size = UDim2.new(1, -12, 0, listH), Position = UDim2.new(0, 6, 0, PAD + HEAD_H + 5), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = c.accent, ScrollBarImageTransparency = 0.4, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 6, Parent = pf })
-    new("UIListLayout", { Padding = UDim.new(0, GAP), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
-
-    if #options == 0 then
-        newLabel(list, spec.empty or "Nothing here", 11, FONT_MAIN, TEXT_MUTED, { Size = UDim2.new(1, 0, 0, ROW_H), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 7 })
-    else
-        for i, name in ipairs(options) do
-            local isSel = (name == spec.selected)
-            local row = new("TextButton", { Size = UDim2.new(1, -4, 0, ROW_H), BackgroundColor3 = isSel and c.hover or c.bgMain, BackgroundTransparency = isSel and 0 or 0.4, Text = "", AutoButtonColor = false, LayoutOrder = i, ZIndex = 7, Parent = list })
-            corner(row, 6); stroke(row, isSel and c.accent or c.border, 1, isSel and 0.2 or 0.5)
-            newLabel(row, name, 11, isSel and FONT_STRONG or FONT_MAIN, isSel and c.accent or TEXT, { Size = UDim2.new(1, -34, 1, 0), Position = UDim2.new(0, 10, 0, 0), TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 8 })
-            if isSel then
-                local dot = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(6, 6), BackgroundColor3 = c.accent, BorderSizePixel = 0, ZIndex = 8, Parent = row })
-                corner(dot, 3)
-            end
-            row.MouseButton1Click:Connect(function() Popup.close(); if spec.onPick then spec.onPick(name) end end)
-        end
-    end
-
-    tween(pf, { Size = UDim2.new(0, totalW, 0, totalH) }, 0.26, Enum.EasingStyle.Back)
-    if spec.arrow then tween(spec.arrow, { Rotation = 180 }, 0.22) end
-    Popup.current = { frame = pf, backdrop = backdrop, anchor = anchor, arrow = spec.arrow, w = totalW }
-end
-
-local header = new("Frame", { Name = "Header", Size = UDim2.new(1, 0, 0, HEADER_H), BackgroundColor3 = Theme.c.bgHeader, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 4, Parent = canvas })
-Theme.bind(header, "BackgroundColor3", "bgHeader")
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(206, 206, 214)), Parent = header })
-
-local headerLine = new("Frame", { Name = "HeaderGlow", Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 0, HEADER_H - 1), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, ZIndex = 5, Parent = canvas })
-Theme.bind(headerLine, "BackgroundColor3", "accent")
-local headerLineGrad = new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 1) }), Offset = Vector2.new(-1, 0), Parent = headerLine })
-TweenService:Create(headerLineGrad, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Offset = Vector2.new(1, 0) }):Play()
-
-local hContent = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ZIndex = 5, Parent = header })
-local logoImg = new("ImageLabel", { Name = "HeaderLogo", AnchorPoint = Vector2.new(0, 0), BackgroundTransparency = 1, Image = LOGO_ICON, ImageColor3 = WHITE, ScaleType = Enum.ScaleType.Fit, ZIndex = 6, Parent = hContent })
-logoImg.Size = UDim2.new(0, LOGO_CONFIG.width, 0, LOGO_CONFIG.height)
-logoImg.Rotation = LOGO_CONFIG.rotation
-logoImg.Position = UDim2.new(0, LOGO_CONFIG.posX, 0, LOGO_CONFIG.posY)
-
-local BTN_SIZE, SEP_W = 30, 1
-local BOX_W = BTN_SIZE * 3 + SEP_W * 2 + 6
-local BOX_H = BTN_SIZE + 6
-
-local pipe = new("Frame", { Size = UDim2.new(0, 3, 0, 24), Position = UDim2.new(0, 108, 0.5, -12), BackgroundColor3 = Color3.fromRGB(70, 70, 80), BorderSizePixel = 0, ZIndex = 6, Parent = hContent })
-corner(pipe, 2)
-new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 0.8) }), Parent = pipe })
-
-local subtitleW = -(118 + BOX_W + 30)
-newLabel(hContent, SUBTITLE_TEXT, 14, FONT_STRONG, TEXT, { Size = UDim2.new(1, subtitleW, 0, 18), Position = UDim2.new(0, 118, 0.5, -17), ZIndex = 6, TextTruncate = Enum.TextTruncate.AtEnd })
-local premiumLbl = newLabel(hContent, PREMIUM_TEXT, 11, FONT_STRONG, WHITE, { Size = UDim2.new(1, subtitleW, 0, 14), Position = UDim2.new(0, 118, 0.5, 3), ZIndex = 6, TextTruncate = Enum.TextTruncate.AtEnd })
-local premiumGrad = new("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 186, 30)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 240, 160)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 186, 30)) }), Offset = Vector2.new(-1, 0), Parent = premiumLbl })
-
-local btnBox = new("Frame", { Size = UDim2.new(0, BOX_W, 0, BOX_H), Position = UDim2.new(1, -(BOX_W + 14), 0.5, -BOX_H / 2), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 8, Parent = hContent })
-corner(btnBox, 9)
-local btnBoxStroke = stroke(btnBox, Theme.c.border, 1, 0.1)
-Theme.bind(btnBox, "BackgroundColor3", "bgMain"); Theme.bind(btnBoxStroke, "Color", "border")
-
-local function makeIconBtn(image, order, size, tint, tip, hoverColor)
-    size = size or 16
-    local b = new("TextButton", { Size = UDim2.new(0, BTN_SIZE, 0, BTN_SIZE), Position = UDim2.new(0, 3 + (order - 1) * (BTN_SIZE + SEP_W), 0.5, -BTN_SIZE / 2), BackgroundColor3 = hoverColor or WHITE, BackgroundTransparency = 1, Text = "", BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 9, Parent = btnBox })
-    corner(b, 7)
-    local img = new("ImageLabel", { Size = UDim2.new(0, size, 0, size), Position = UDim2.new(0.5, -size / 2, 0.5, -size / 2), BackgroundTransparency = 1, Image = image, ImageColor3 = tint or Color3.fromRGB(215, 215, 220), ZIndex = 10, Parent = b })
-    b.MouseEnter:Connect(function() tween(b, { BackgroundTransparency = hoverColor and 0.7 or 0.88 }, 0.12); tween(img, { Size = UDim2.new(0, size + 3, 0, size + 3), Position = UDim2.new(0.5, -(size + 3) / 2, 0.5, -(size + 3) / 2) }, 0.15, Enum.EasingStyle.Back); if tip then Tooltip.show(tip, b) end end)
-    b.MouseLeave:Connect(function() tween(b, { BackgroundTransparency = 1 }, 0.15); tween(img, { Size = UDim2.new(0, size, 0, size), Position = UDim2.new(0.5, -size / 2, 0.5, -size / 2) }, 0.15); Tooltip.hide() end)
-    return b, img
-end
-
-local discordBtn, discordIcon = makeIconBtn(DISCORD_ICON, 1, 22, DISCORD_TINT, "Discord")
-local minimizeBtn = makeIconBtn(MIN_ICON, 2, 16, nil, "Minimize")
-local closeBtnHeader = makeIconBtn(CLOSE_ICON, 3, 16, nil, "Close", C_ERROR)
-
-for i = 1, 2 do
-    local sep = new("Frame", { Size = UDim2.new(0, SEP_W, 0, BTN_SIZE - 8), Position = UDim2.new(0, 3 + i * BTN_SIZE + (i - 1) * SEP_W, 0.5, -(BTN_SIZE - 8) / 2), BackgroundColor3 = Theme.c.border, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 9, Parent = btnBox })
-    Theme.bind(sep, "BackgroundColor3", "border")
-end
-
-local dragCatcher = new("TextButton", { Size = UDim2.new(1, -(BOX_W + 28), 1, 0), Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, Text = "", BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 7, Parent = hContent })
-
-local discordBusy = false
-discordBtn.MouseButton1Click:Connect(function()
-    if discordBusy then return end
-    discordBusy = true
-    pcall(function() setclipboard(DISCORD_URL) end)
-    Tooltip.hide()
-    local origSize, origPos = discordIcon.Size, discordIcon.Position
-    tween(discordIcon, { Rotation = 360, Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(0.5, -14, 0.5, -14) }, 0.45, Enum.EasingStyle.Back)
-    local check = new("ImageLabel", { Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(0.5, -11, 0.5, -11), BackgroundTransparency = 1, Image = CHECK_ICON, ImageColor3 = C_SUCCESS, ImageTransparency = 1, Rotation = -90, ScaleType = Enum.ScaleType.Fit, ZIndex = 11, Parent = discordBtn })
-    task.delay(0.25, function() if check.Parent then tween(check, { ImageTransparency = 0, Rotation = 0 }, 0.28, Enum.EasingStyle.Back) end end)
-    task.delay(1.15, function() if check.Parent then tween(check, { ImageTransparency = 1 }, 0.2) end end)
-    task.delay(1.4, function() if check.Parent then check:Destroy() end end)
-    task.delay(1.2, function() if discordIcon.Parent then tween(discordIcon, { Rotation = 0, Size = origSize, Position = origPos }, 0.2) end end)
-    notify("Discord", "Link copied!", 1.8, "success")
-    task.delay(1.5, function() discordBusy = false end)
-end)
-
-local sidebar = new("Frame", { Name = "Sidebar", Size = UDim2.new(0, SIDEBAR_W, 1, -HEADER_H), Position = UDim2.new(0, 0, 0, HEADER_H), BackgroundColor3 = Theme.c.bgHeader, BorderSizePixel = 0, ZIndex = 3, Parent = canvas })
-Theme.bind(sidebar, "BackgroundColor3", "bgHeader")
-new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(200, 200, 210)), Parent = sidebar })
-local sideDivider = new("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = Theme.c.border, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 4, Parent = sidebar })
-Theme.bind(sideDivider, "BackgroundColor3", "border")
-
-local TABS = {
-    { name = "Settings", icon = "rbxassetid://7734053495" },
-}
-local TAB_H, TAB_GAP, TAB_TOP = 38, 4, 12
-local tabW = SIDEBAR_W - 18
-
-local tabIndicator = new("Frame", { Name = "TabIndicator", Size = UDim2.fromOffset(tabW, TAB_H), Position = UDim2.fromOffset(8, TAB_TOP), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 1, Parent = sidebar })
-corner(tabIndicator, 9)
-local indStroke = stroke(tabIndicator, Theme.c.border, 1, 0.3)
-Theme.bind(tabIndicator, "BackgroundColor3", "bgMain"); Theme.bind(indStroke, "Color", "accent")
-local indBar = new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(0, 3, 0.55, 0), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, ZIndex = 2, Parent = tabIndicator })
-corner(indBar, 2); Theme.bind(indBar, "BackgroundColor3", "accent")
-
-local profile = new("Frame", { Name = "Profile", Size = UDim2.new(0, tabW, 0, 48), Position = UDim2.new(0, 8, 1, -58), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 2, Parent = sidebar })
-corner(profile, 10)
-local profStroke = stroke(profile, Theme.c.border, 1, 0.25)
-Theme.bind(profile, "BackgroundColor3", "bgMain"); Theme.bind(profStroke, "Color", "border")
-local avatar = new("ImageLabel", { Size = UDim2.fromOffset(32, 32), Position = UDim2.new(0, 8, 0.5, -16), BackgroundColor3 = Theme.c.trackOff, BorderSizePixel = 0, ZIndex = 3, Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", LocalPlayer.UserId), Parent = profile })
-corner(avatar, 16)
-local avStroke = stroke(avatar, Theme.c.accent, 1.5, 0.2); Theme.bind(avStroke, "Color", "accent")
-local onlineDot = new("Frame", { Size = UDim2.fromOffset(9, 9), Position = UDim2.new(0, 33, 0.5, 7), BackgroundColor3 = C_SUCCESS, BorderSizePixel = 0, ZIndex = 5, Parent = profile })
-corner(onlineDot, 5)
-local dotStroke = stroke(onlineDot, Theme.c.bgMain, 1.5, 0); Theme.bind(dotStroke, "Color", "bgMain")
-newLabel(profile, LocalPlayer.DisplayName ~= "" and LocalPlayer.DisplayName or LocalPlayer.Name, 12, FONT_MAIN, TEXT, { Size = UDim2.new(1, -52, 0, 16), Position = UDim2.new(0, 48, 0.5, -16), TextTruncate = Enum.TextTruncate.AtEnd })
-newLabel(profile, "@" .. LocalPlayer.Name, 10, FONT_MAIN, TEXT_MUTED, { Size = UDim2.new(1, -52, 0, 14), Position = UDim2.new(0, 48, 0.5, 1), TextTruncate = Enum.TextTruncate.AtEnd })
-
-local contentGroup = new("CanvasGroup", { Name = "Content", Size = UDim2.new(1, -SIDEBAR_W, 1, -HEADER_H), Position = UDim2.new(0, SIDEBAR_W, 0, HEADER_H), BackgroundTransparency = 1, GroupTransparency = 0, ZIndex = 2, Parent = canvas })
-local pages = {}
-local function makePage(tabName)
-    local page = new("ScrollingFrame", { Name = tabName, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3, ScrollBarImageColor3 = Theme.c.accent, ScrollBarImageTransparency = 0.45, CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y, Visible = false, ZIndex = 3, Parent = contentGroup })
-    Theme.bind(page, "ScrollBarImageColor3", "accent")
-    new("UIPadding", { PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 16), PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 16), Parent = page })
-    new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })
-    pages[tabName] = page
-    return page
-end
-for _, tab in ipairs(TABS) do makePage(tab.name) end
-
-local function cardBase(parent, height, order, clickable)
-    local wrap = new("Frame", { Name = "Wrap", Size = UDim2.new(1, 0, 0, height), BackgroundTransparency = 1, LayoutOrder = order or 0, Parent = parent })
-    wrap:SetAttribute("Entrance", true)
-    local props = { Name = "Card", Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Theme.c.bgCard, BorderSizePixel = 0, ClipsDescendants = true, Parent = wrap }
-    local card
-    if clickable then props.AutoButtonColor = false; props.Text = ""; card = new("TextButton", props)
-    else card = new("Frame", props) end
-    corner(card, 10)
-    local st = stroke(card, Theme.c.border, 1, 0)
-    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(212, 212, 218)), Parent = card })
-    local bar = new("Frame", { Name = "AccentBar", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(0, 3, 0, 0), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, ZIndex = 4, Parent = card })
-    corner(bar, 2)
-    return wrap, card, st, bar
-end
-
-local function setScrolling(page, enabled)
-    if page and page:IsA("ScrollingFrame") then page.ScrollingEnabled = enabled end
-end
-
-local function addSectionHeader(parent, text, order)
-    local wrap = new("Frame", { Name = "Section", Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
-    local dot = new("Frame", { Size = UDim2.fromOffset(4, 12), Position = UDim2.new(0, 2, 0, 3), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, Parent = wrap })
-    corner(dot, 2); Theme.bind(dot, "BackgroundColor3", "accent")
-    newLabel(wrap, string.upper(text), 11, FONT_STRONG, TEXT_DIM, { Size = UDim2.new(1, -16, 0, 18), Position = UDim2.new(0, 14, 0, 0) })
-    local line = new("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -3), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, Parent = wrap })
-    Theme.bind(line, "BackgroundColor3", "accent")
-    new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) }), Parent = line })
-    return wrap
-end
-
-local function addClickButton(parent, titleText, iconId, order, callback)
-    local wrap, card, st, bar = cardBase(parent, CARD_H, order, true)
-    local hover = false
-    local title = newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -90, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
-    local icon = new("ImageLabel", { Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -40, 0.5, -12), BackgroundTransparency = 1, Image = iconId, ImageColor3 = TEXT, ZIndex = 3, Parent = card })
-    local function render(animate)
-        local c = Theme.c; local d = animate and 0.18 or 0
-        apply(card, { BackgroundColor3 = hover and c.hover or c.bgCard }, d)
-        apply(st, { Color = hover and c.accent or c.border }, d)
-        apply(title, { TextColor3 = hover and c.accent or TEXT }, d)
-        apply(icon, { ImageColor3 = hover and c.accent or TEXT }, d)
-        apply(bar, { Size = UDim2.new(0, 3, hover and 0.5 or 0, 0) }, d, Enum.EasingStyle.Back)
-    end
-    Theme.reg(card, function(_, a) render(a) end)
-    card.MouseEnter:Connect(function() hover = true render(true) end)
-    card.MouseLeave:Connect(function() hover = false render(true) end)
-    card.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then ripple(card, input) end
-    end)
-    card.MouseButton1Click:Connect(function()
-        tween(icon, { Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -43, 0.5, -15), Rotation = 12 }, 0.1)
-        task.delay(0.1, function() if icon.Parent then tween(icon, { Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -40, 0.5, -12), Rotation = 0 }, 0.3, Enum.EasingStyle.Back) end end)
-        if callback then callback(card) end
-    end)
-    return card
-end
-
-local function addToggle(parent, key, titleText, order, callback)
-    local state = Options[key] == true
-    local wrap, card, st, bar = cardBase(parent, CARD_H, order, true)
-    local hover = false
-    local title = newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -90, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
-    local track = new("Frame", { Size = UDim2.fromOffset(44, 22), Position = UDim2.new(1, -58, 0.5, -11), BackgroundColor3 = Theme.c.trackOff, BorderSizePixel = 0, ZIndex = 3, Parent = card })
-    corner(track, 11)
-    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(205, 205, 214)), Parent = track })
-    local tStroke = stroke(track, Theme.c.border, 1, 0)
-    local knob = new("Frame", { Size = UDim2.fromOffset(16, 16), Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 4, Parent = track })
-    corner(knob, 8)
-    local function render(animate)
-        local c = Theme.c; local d = animate and 0.22 or 0
-        apply(card, { BackgroundColor3 = hover and c.hover or c.bgCard }, d)
-        apply(st, { Color = state and c.border:Lerp(c.accent, 0.45) or (hover and c.border:Lerp(c.accent, 0.3) or c.border) }, d)
-        apply(title, { TextColor3 = state and c.accent or TEXT }, d)
-        apply(track, { BackgroundColor3 = state and c.accent or c.trackOff }, d)
-        apply(tStroke, { Color = state and c.glow or c.border }, d)
-        apply(knob, { Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = state and WHITE or Color3.fromRGB(185, 185, 195) }, d, Enum.EasingStyle.Back)
-        apply(bar, { Size = UDim2.new(0, 3, state and 0.55 or 0, 0) }, d, Enum.EasingStyle.Back)
-    end
-    Theme.reg(card, function(_, a) render(a) end)
-    Registry[key] = function(v) state = v == true; setOption(key, state); render(true); if callback then pcall(callback, state) end end
-    card.MouseEnter:Connect(function() hover = true render(true) end)
-    card.MouseLeave:Connect(function() hover = false render(true) end)
-    card.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then ripple(card, input) end end)
-    card.MouseButton1Click:Connect(function()
-        state = not state
-        setOption(key, state)
-        tween(knob, { Size = UDim2.fromOffset(22, 16) }, 0.1)
-        task.delay(0.1, function() if knob.Parent then tween(knob, { Size = UDim2.fromOffset(16, 16) }, 0.2, Enum.EasingStyle.Back) end end)
-        render(true)
-        if callback then callback(state) end
-    end)
-end
-
-local function addSlider(parent, key, titleText, minV, maxV, order, callback)
-    minV = minV or 0; maxV = maxV or 100
-    local value = math.clamp(math.floor((tonumber(Options[key]) or minV) + 0.5), minV, maxV)
-    local wrap, card, st, bar = cardBase(parent, 58, order, false)
-    local hover, dragging, focused = false, false, false
-    local title = newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -110, 0, 20), Position = UDim2.new(0, 16, 0, 8) })
-    local numBox = new("TextBox", { Size = UDim2.fromOffset(62, 24), Position = UDim2.new(1, -78, 0, 6), BackgroundColor3 = Theme.c.bgMain, Text = tostring(value), TextColor3 = Theme.c.accent, TextSize = 12, Font = FONT_STRONG, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Center, ClearTextOnFocus = false, ZIndex = 3, Parent = card })
-    corner(numBox, 7)
-    local nbStroke = stroke(numBox, Theme.c.border, 1, 0)
-    local hit = new("TextButton", { Size = UDim2.new(1, -32, 0, 24), Position = UDim2.new(0, 16, 1, -30), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 4, Parent = card })
-    local track = new("Frame", { Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 0.5, -3), BackgroundColor3 = Theme.c.trackOff, BorderSizePixel = 0, ZIndex = 4, Parent = hit })
-    corner(track, 3)
-    local ratio0 = (value - minV) / (maxV - minV)
-    local fill = new("Frame", { Size = UDim2.new(ratio0, 0, 1, 0), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 5, Parent = track })
-    corner(fill, 3)
-    local fillGrad = new("UIGradient", { Color = ColorSequence.new(Theme.c.accent, Theme.c.glow), Parent = fill })
-    local knob = new("Frame", { Size = UDim2.fromOffset(14, 14), Position = UDim2.new(ratio0, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 6, Parent = track })
-    corner(knob, 7)
-    local kStroke = stroke(knob, Theme.c.accent, 2, 0)
-    local function render(animate)
-        local c = Theme.c; local d = animate and 0.18 or 0
-        apply(card, { BackgroundColor3 = (hover or dragging) and c.hover or c.bgCard }, d)
-        apply(st, { Color = (hover or dragging) and c.border:Lerp(c.accent, 0.4) or c.border }, d)
-        apply(track, { BackgroundColor3 = c.trackOff }, d)
-        apply(numBox, { BackgroundColor3 = c.bgMain, TextColor3 = c.accent }, d)
-        apply(nbStroke, { Color = focused and c.accent or c.border }, d)
-        apply(kStroke, { Color = c.accent }, d)
-        apply(bar, { Size = UDim2.new(0, 3, dragging and 0.55 or 0, 0) }, d, Enum.EasingStyle.Back)
-        apply(knob, { Size = dragging and UDim2.fromOffset(18, 18) or UDim2.fromOffset(14, 14) }, d, Enum.EasingStyle.Back)
-        fillGrad.Color = ColorSequence.new(c.accent, c.glow)
-    end
-    Theme.reg(card, function(_, a) render(a) end)
-    local function setValue(v, fromBox, silent)
-        v = math.clamp(math.floor(v + 0.5), minV, maxV)
-        local changed = v ~= value
-        value = v
-        setOption(key, value)
-        local r = (value - minV) / (maxV - minV)
-        local d = silent and 0 or 0.08
-        apply(fill, { Size = UDim2.new(r, 0, 1, 0) }, d)
-        apply(knob, { Position = UDim2.new(r, 0, 0.5, 0) }, d)
-        if not fromBox then numBox.Text = tostring(value) end
-        if not silent and changed and callback then callback(value) end
-    end
-    Registry[key] = function(v) setValue(tonumber(v) or minV, false, true) end
-    local function fromX(x)
-        local pos = math.clamp((x - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
-        setValue(minV + (maxV - minV) * pos, false)
-    end
-    hit.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; setScrolling(parent, false); render(true); fromX(input.Position.X)
-        end
-    end)
-    bind(UserInputService.InputChanged, function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then fromX(input.Position.X) end
-    end)
-    bind(UserInputService.InputEnded, function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            dragging = false; setScrolling(parent, true); render(true)
-        end
-    end)
-    numBox.Focused:Connect(function() focused = true render(true) end)
-    numBox.FocusLost:Connect(function()
-        focused = false; render(true)
-        local n = tonumber(numBox.Text)
-        if not n then numBox.Text = tostring(value) return end
-        setValue(n, false)
-    end)
-    card.MouseEnter:Connect(function() hover = true render(true) end)
-    card.MouseLeave:Connect(function() hover = false render(true) end)
-end
-
-local function addTextBox(parent, key, titleText, order, callback, placeholder)
-    local initText = key and tostring(Options[key] or "") or ""
-    local wrap, card, st, bar = cardBase(parent, CARD_H, order, false)
-    local hover, focused = false, false
-    newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -170, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
-    local box = new("TextBox", { Size = UDim2.fromOffset(142, 26), Position = UDim2.new(1, -156, 0.5, -13), BackgroundColor3 = Theme.c.bgMain, Text = initText, PlaceholderText = placeholder or "Digite...", PlaceholderColor3 = Color3.fromRGB(90, 90, 105), TextColor3 = Theme.c.accent, TextSize = 11, Font = FONT_STRONG, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 3, Parent = card })
-    corner(box, 7)
-    new("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9), Parent = box })
-    local bStroke = stroke(box, Theme.c.border, 1, 0)
-    local function render(animate)
-        local c = Theme.c; local d = animate and 0.18 or 0
-        apply(card, { BackgroundColor3 = (hover or focused) and c.hover or c.bgCard }, d)
-        apply(st, { Color = focused and c.accent or (hover and c.border:Lerp(c.accent, 0.3) or c.border) }, d)
-        apply(box, { BackgroundColor3 = c.bgMain, TextColor3 = c.accent }, d)
-        apply(bStroke, { Color = focused and c.accent or c.border }, d)
-    end
-    Theme.reg(card, function(_, a) render(a) end)
-    if key then Registry[key] = function(v) local s = tostring(v or ""); setOption(key, s); box.Text = s end end
-    box.Focused:Connect(function() focused = true render(true) end)
-    box.FocusLost:Connect(function() focused = false; render(true); if key then setOption(key, box.Text) end; if callback then callback(box.Text) end end)
-    card.MouseEnter:Connect(function() hover = true render(true) end)
-    card.MouseLeave:Connect(function() hover = false render(true) end)
-    return box
-end
-
-local function addDropdown(parent, titleText, order, spec)
-    local wrap, card, st, bar = cardBase(parent, CARD_H + 4, order, true)
-    local hover = false
-    newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -170, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
-    local box = new("Frame", { Size = UDim2.fromOffset(138, 28), Position = UDim2.new(1, -152, 0.5, -14), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 3, Parent = card })
-    corner(box, 8)
-    local boxStroke = stroke(box, Theme.c.border, 1, 0.1)
-    local display = newLabel(box, "None", 11, FONT_MAIN, TEXT_MUTED, { Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 10, 0, 0), TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 4 })
-    local arrow = new("ImageLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(14, 14), Position = UDim2.new(1, -14, 0.5, 0), BackgroundTransparency = 1, Image = ARROW_ICON, ImageColor3 = TEXT_MUTED, ScaleType = Enum.ScaleType.Fit, ZIndex = 4, Parent = box })
-    local obj = {}
-    local function render(animate)
-        local c = Theme.c; local d = animate and 0.18 or 0
-        local v = spec.get()
-        local isNone = (v == nil or v == "" or v == "None")
-        local open = Popup.current and Popup.current.anchor == box
-        display.Text = isNone and "None" or v
-        apply(card, { BackgroundColor3 = hover and c.hover or c.bgCard }, d)
-        apply(st, { Color = (hover or open) and c.accent or c.border }, d)
-        apply(display, { TextColor3 = isNone and TEXT_MUTED or c.accent }, d)
-        apply(arrow, { ImageColor3 = (hover or open) and c.accent or TEXT_MUTED }, d)
-        apply(box, { BackgroundColor3 = c.bgMain }, d)
-        apply(boxStroke, { Color = open and c.accent or c.border }, d)
-    end
-    obj.refresh = function() render(true) end
-    Theme.reg(card, function(_, a) render(a) end)
-    card.MouseEnter:Connect(function() hover = true render(true) end)
-    card.MouseLeave:Connect(function() hover = false render(true) end)
-    card.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then ripple(card, input) end end)
-    card.MouseButton1Click:Connect(function()
-        Popup.open(box, { header = spec.header, options = spec.getOptions(), selected = spec.get(), empty = spec.empty, arrow = arrow, onPick = function(name) spec.set(name); render(true) end })
-        task.delay(0.05, function() render(true) end)
-    end)
-    return obj
-end
-
-local function addButtonRow(parent, order, defs)
-    local wrap = new("Frame", { Name = "Wrap", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
-    wrap:SetAttribute("Entrance", true)
-    local row = new("Frame", { Name = "Card", Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Parent = wrap })
-    new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = row })
-    local n = #defs
-    local buttons = {}
-    for i, def in ipairs(defs) do
-        local btn = new("TextButton", { Size = UDim2.new(1 / n, -(8 * (n - 1) / n), 1, 0), BackgroundColor3 = Theme.c.bgCard, Text = def.text, TextColor3 = TEXT, Font = FONT_MAIN, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, ClipsDescendants = true, LayoutOrder = i, Parent = row })
-        corner(btn, 9)
-        local bs = stroke(btn, Theme.c.border, 1, 0.2)
-        new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(212, 212, 218)), Parent = btn })
-        local hover = false
-        local function render(animate)
-            local c = Theme.c; local d = animate and 0.15 or 0
-            local hc = def.hoverColor or c.accent
-            apply(btn, { BackgroundColor3 = hover and c.hover or c.bgCard, TextColor3 = hover and hc or TEXT }, d)
-            apply(bs, { Color = hover and hc or c.border, Transparency = hover and 0 or 0.2 }, d)
-        end
-        Theme.reg(btn, function(_, a) render(a) end)
-        btn.MouseEnter:Connect(function() hover = true render(true) end)
-        btn.MouseLeave:Connect(function() hover = false render(true) end)
-        btn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then ripple(btn, input) end end)
-        btn.MouseButton1Click:Connect(function() if def.callback then def.callback(btn) end end)
-        buttons[i] = btn
-    end
-    return buttons
-end
-
-local function addColorPicker(parent, key, titleText, order)
-    local EXPANDED_H = CARD_H + 168
-    local wrap, card, st, bar = cardBase(parent, CARD_H, order, false)
-    local hover = false
-    newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -150, 0, CARD_H), Position = UDim2.new(0, 16, 0, 0) })
-    local hexLbl = newLabel(card, toHex(Options[key] or WHITE), 11, FONT_CODE, TEXT_MUTED, { Size = UDim2.fromOffset(70, CARD_H), Position = UDim2.new(1, -128, 0, 0), TextXAlignment = Enum.TextXAlignment.Right })
-    local colorSq = new("TextButton", { Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -46, 0, 6), BackgroundColor3 = Options[key] or WHITE, Text = "", AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 6, Parent = card })
-    corner(colorSq, 8)
-    local sqStroke = stroke(colorSq, Theme.c.border, 1.5, 0)
-    local rowHit = new("TextButton", { Size = UDim2.new(1, 0, 0, CARD_H), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 4, Parent = card })
-    local content = new("Frame", { Size = UDim2.new(1, 0, 0, EXPANDED_H - CARD_H), Position = UDim2.new(0, 0, 0, CARD_H), BackgroundTransparency = 1, ZIndex = 3, Parent = card })
-    new("Frame", { Size = UDim2.new(1, -28, 0, 1), Position = UDim2.new(0, 14, 0, 0), BackgroundColor3 = Theme.c.border, BackgroundTransparency = 0.3, BorderSizePixel = 0, Parent = content })
-    local preview = new("Frame", { Size = UDim2.fromOffset(64, 64), Position = UDim2.new(0, 16, 0, 14), BackgroundColor3 = Options[key] or WHITE, BorderSizePixel = 0, ZIndex = 3, Parent = content })
-    corner(preview, 10); stroke(preview, Theme.c.border, 1.5, 0)
-    local previewHex = newLabel(content, toHex(Options[key] or WHITE), 12, FONT_CODE, TEXT, { Size = UDim2.fromOffset(100, 18), Position = UDim2.new(0, 16, 0, 84) })
-    newLabel(content, "R G B", 9, FONT_MAIN, TEXT_MUTED, { Size = UDim2.fromOffset(100, 12), Position = UDim2.new(0, 16, 0, 102) })
-    local SV = 118
-    local sv = new("Frame", { Size = UDim2.fromOffset(SV, SV), Position = UDim2.new(1, -(SV + 16), 0, 14), BackgroundColor3 = Color3.fromRGB(255, 0, 0), BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 3, Parent = content })
-    corner(sv, 8); stroke(sv, Theme.c.border, 1, 0.2)
-    local whiteLayer = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 4, Parent = sv })
-    corner(whiteLayer, 8); new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = whiteLayer })
-    local blackLayer = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = BLACK, BorderSizePixel = 0, ZIndex = 5, Parent = sv })
-    corner(blackLayer, 8); new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }), Parent = blackLayer })
-    local svHit = new("TextButton", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 7, Parent = sv })
-    local svCursor = new("Frame", { Size = UDim2.fromOffset(16, 16), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 8, Parent = sv })
-    corner(svCursor, 8); stroke(svCursor, WHITE, 2, 0)
-    local svDot = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.fromOffset(4, 4), BackgroundColor3 = BLACK, BorderSizePixel = 0, ZIndex = 8, Parent = svCursor })
-    corner(svDot, 2)
-    local hueWrap = new("Frame", { Size = UDim2.new(1, -32, 0, 18), Position = UDim2.new(0, 16, 0, 14 + SV + 12), BackgroundTransparency = 1, ZIndex = 3, Parent = content })
-    local hueTrack = new("Frame", { Size = UDim2.new(1, 0, 0, 12), Position = UDim2.new(0, 0, 0.5, -6), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 3, Parent = hueWrap })
-    corner(hueTrack, 6)
-    new("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)), ColorSequenceKeypoint.new(1/6, Color3.fromRGB(255, 255, 0)), ColorSequenceKeypoint.new(2/6, Color3.fromRGB(0, 255, 0)), ColorSequenceKeypoint.new(3/6, Color3.fromRGB(0, 255, 255)), ColorSequenceKeypoint.new(4/6, Color3.fromRGB(0, 0, 255)), ColorSequenceKeypoint.new(5/6, Color3.fromRGB(255, 0, 255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)) }), Parent = hueTrack })
-    local hueHit = new("TextButton", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 5, Parent = hueWrap })
-    local hueCursor = new("Frame", { Size = UDim2.fromOffset(16, 20), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(255, 0, 0), BorderSizePixel = 0, ZIndex = 6, Parent = hueWrap })
-    corner(hueCursor, 6); stroke(hueCursor, WHITE, 2.5, 0)
-    local h0, s0, v0 = rgbToHsv(Options[key] or WHITE)
-    local picker = { hue = h0, sat = s0, val = v0, svDrag = false, hueDrag = false, open = false }
-    local function placeSV() svCursor.Position = UDim2.new(picker.sat, 0, 1 - picker.val, 0) end
-    local function placeHue() hueCursor.Position = UDim2.new(picker.hue / 360, 0, 0.5, 0); hueCursor.BackgroundColor3 = hsvToRgb(picker.hue, 1, 1) end
-    local function commit()
-        local c = hsvToRgb(picker.hue, picker.sat, picker.val)
-        genv.BabisESPColor = c
-        setOption(key, c)
-        preview.BackgroundColor3 = c; colorSq.BackgroundColor3 = c
-        local hx = toHex(c); hexLbl.Text = hx; previewHex.Text = hx
-    end
-    placeSV(); placeHue()
-    sv.BackgroundColor3 = hsvToRgb(picker.hue, 1, 1)
-    Registry[key] = function(newColor)
-        if typeof(newColor) ~= "Color3" then return end
-        local h, s, v = rgbToHsv(newColor)
-        picker.hue, picker.sat, picker.val = h, s, v
-        placeSV(); placeHue(); sv.BackgroundColor3 = hsvToRgb(h, 1, 1); commit()
-    end
-    local function updateSV(mx, my)
-        local ap, as = sv.AbsolutePosition, sv.AbsoluteSize
-        if as.X <= 0 or as.Y <= 0 then return end
-        picker.sat = math.clamp((mx - ap.X) / as.X, 0, 1)
-        picker.val = 1 - math.clamp((my - ap.Y) / as.Y, 0, 1)
-        placeSV(); commit()
-    end
-    local function updateHue(mx)
-        local ap, as = hueWrap.AbsolutePosition, hueWrap.AbsoluteSize
-        if as.X <= 0 then return end
-        picker.hue = math.clamp((mx - ap.X) / as.X, 0, 1) * 359.99
-        placeHue(); sv.BackgroundColor3 = hsvToRgb(picker.hue, 1, 1); commit()
-    end
-    svHit.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then picker.svDrag = true; setScrolling(parent, false); updateSV(input.Position.X, input.Position.Y) end
-    end)
-    hueHit.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then picker.hueDrag = true; setScrolling(parent, false); updateHue(input.Position.X) end
-    end)
-    bind(UserInputService.InputChanged, function(input)
-        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
-        if picker.svDrag then updateSV(input.Position.X, input.Position.Y)
-        elseif picker.hueDrag then updateHue(input.Position.X) end
-    end)
-    bind(UserInputService.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if picker.svDrag or picker.hueDrag then setScrolling(parent, true) end
-            picker.svDrag, picker.hueDrag = false, false
-        end
-    end)
-    local function render(animate)
-        local c = Theme.c; local d = animate and 0.2 or 0
-        apply(card, { BackgroundColor3 = (hover or picker.open) and c.hover or c.bgCard }, d)
-        apply(st, { Color = picker.open and c.accent or (hover and c.border:Lerp(c.accent, 0.3) or c.border) }, d)
-        apply(sqStroke, { Color = picker.open and c.accent or c.border }, d)
-    end
-    Theme.reg(card, function(_, a) render(a) end)
-    local function setOpen(open)
-        picker.open = open
-        tween(wrap, { Size = UDim2.new(1, 0, 0, open and EXPANDED_H or CARD_H) }, 0.34, Enum.EasingStyle.Quint)
-        render(true)
-    end
-    colorSq.Activated:Connect(function() setOpen(not picker.open) end)
-    rowHit.Activated:Connect(function() setOpen(not picker.open) end)
-    rowHit.MouseEnter:Connect(function() hover = true render(true) end)
-    rowHit.MouseLeave:Connect(function() hover = false render(true) end)
-end
-
--- ===== GAME LOGIC — wrapped in closure to avoid 200-local limit =====
-local Game = (function()
-
+-- ---- Overlays ----
 local Overlay = { activeKill = nil, activeClimb = nil }
 
 local function showKillOverlay(duration)
     duration = duration or 2.0
     if Overlay.activeKill and Overlay.activeKill.Parent then Overlay.activeKill:Destroy() end
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "BabisKillOverlay"; sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true
-    sg.DisplayOrder = 999999; sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    sg.Parent = uiParent; Overlay.activeKill = sg
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1,0,1,0); bg.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    bg.BackgroundTransparency = 1; bg.BorderSizePixel = 0; bg.Parent = sg
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1; lbl.Text = "TRYING TO KILL HULK"
-    lbl.TextColor3 = Color3.fromRGB(255, 40, 40); lbl.Font = Enum.Font.GothamBlack
-    lbl.TextSize = 52; lbl.TextStrokeTransparency = 0; lbl.TextStrokeColor3 = Color3.fromRGB(120, 0, 0)
-    lbl.TextTransparency = 1; lbl.Size = UDim2.new(0, 0, 0, 90)
-    lbl.Position = UDim2.new(0.5, 0, 0.5, -45); lbl.AnchorPoint = Vector2.new(0.5, 0.5); lbl.Parent = bg
+    local sg = new("ScreenGui", { Name = "BabisKillOverlay", ResetOnSpawn = false, IgnoreGuiInset = true,
+        DisplayOrder = 999999, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = uiParent })
+    Overlay.activeKill = sg
+    local bg = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = BLACK, BackgroundTransparency = 1, BorderSizePixel = 0, Parent = sg })
+    local lbl = new("TextLabel", { BackgroundTransparency = 1, Text = "TRYING TO KILL HULK",
+        TextColor3 = Color3.fromRGB(255, 40, 40), Font = Enum.Font.GothamBlack, TextSize = 52,
+        TextStrokeTransparency = 0, TextStrokeColor3 = Color3.fromRGB(120, 0, 0),
+        TextTransparency = 1, Size = UDim2.new(0, 0, 0, 90), Position = UDim2.new(0.5, 0, 0.5, -45),
+        AnchorPoint = Vector2.new(0.5, 0.5), Parent = bg })
     TweenService:Create(bg, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
     TweenService:Create(lbl, TweenInfo.new(0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(1, 0, 0, 90), TextTransparency = 0 }):Play()
     task.delay(math.max(duration - 0.6, 0.1), function()
@@ -1211,19 +745,15 @@ end
 local function showClimbOverlay(duration)
     duration = duration or 1.2
     if Overlay.activeClimb and Overlay.activeClimb.Parent then Overlay.activeClimb:Destroy() end
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "BabisClimbOverlay"; sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true
-    sg.DisplayOrder = 999997; sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    sg.Parent = uiParent; Overlay.activeClimb = sg
-    local bg = Instance.new("Frame")
-    bg.Size = UDim2.new(1,0,1,0); bg.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    bg.BackgroundTransparency = 1; bg.BorderSizePixel = 0; bg.Parent = sg
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1; lbl.Text = "CLIMBING"
-    lbl.TextColor3 = Color3.fromRGB(90, 165, 255); lbl.Font = Enum.Font.GothamBlack
-    lbl.TextSize = 44; lbl.TextStrokeTransparency = 0; lbl.TextStrokeColor3 = Color3.fromRGB(20, 50, 120)
-    lbl.TextTransparency = 1; lbl.Size = UDim2.new(1, 0, 0, 80)
-    lbl.Position = UDim2.new(0.5, 0, 0.5, -40); lbl.AnchorPoint = Vector2.new(0.5, 0.5); lbl.Parent = bg
+    local sg = new("ScreenGui", { Name = "BabisClimbOverlay", ResetOnSpawn = false, IgnoreGuiInset = true,
+        DisplayOrder = 999997, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = uiParent })
+    Overlay.activeClimb = sg
+    local bg = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = BLACK, BackgroundTransparency = 1, BorderSizePixel = 0, Parent = sg })
+    local lbl = new("TextLabel", { BackgroundTransparency = 1, Text = "CLIMBING",
+        TextColor3 = Color3.fromRGB(255, 112, 22), Font = Enum.Font.GothamBlack, TextSize = 44,
+        TextStrokeTransparency = 0, TextStrokeColor3 = Color3.fromRGB(80, 30, 5),
+        TextTransparency = 1, Size = UDim2.new(1, 0, 0, 80), Position = UDim2.new(0.5, 0, 0.5, -40),
+        AnchorPoint = Vector2.new(0.5, 0.5), Parent = bg })
     TweenService:Create(bg, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { BackgroundTransparency = 0 }):Play()
     TweenService:Create(lbl, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { TextTransparency = 0 }):Play()
     task.delay(math.max(duration - 0.35, 0.1), function()
@@ -1233,6 +763,35 @@ local function showClimbOverlay(duration)
     task.delay(duration, function() if sg and sg.Parent then sg:Destroy() end; if Overlay.activeClimb == sg then Overlay.activeClimb = nil end end)
 end
 
+-- ---- Rewards (Auto Collect) ----
+local Rewards = { enabled = false, interval = 2, last = 0,
+    claimDaily = nil, claimMission = nil,
+    missionIds = {"PLAY_HULK", "WIN_ROUNDS", "SURVIVE_SECONDS"} }
+do
+    local ok, folder = pcall(function() return ReplicatedStorage:WaitForChild("HulkSkinSystem", 10) end)
+    if ok and folder then
+        Rewards.claimDaily = folder:FindFirstChild("ClaimDaily")
+        Rewards.claimMission = folder:FindFirstChild("ClaimMission")
+    end
+end
+local function rewardsCollect()
+    if Rewards.claimDaily then pcall(function() Rewards.claimDaily:InvokeServer() end) end
+    if Rewards.claimMission then
+        for _, mid in ipairs(Rewards.missionIds) do
+            pcall(function() Rewards.claimMission:InvokeServer(mid) end)
+            task.wait(0.3)
+        end
+    end
+end
+RunService.Heartbeat:Connect(function()
+    if not Rewards.enabled then return end
+    local now = tick(); if now - Rewards.last < Rewards.interval then return end
+    Rewards.last = now; task.spawn(function() pcall(rewardsCollect) end)
+end)
+function Rewards.enable() Rewards.enabled = true; Rewards.last = 0; task.spawn(function() pcall(rewardsCollect) end) end
+function Rewards.disable() Rewards.enabled = false end
+
+-- ---- Infinite Stamina ----
 local InfiniteStamina = {
     enabled = false, runTrack = nil, crawlTouchUntil = 0, crawlBtnRef = nil,
     connBegin = nil, connEnd = nil,
@@ -1244,8 +803,8 @@ local InfiniteStamina = {
 }
 do
     local function getChar() return LocalPlayer.Character end
-    local function getHum() local ch = getChar(); return ch and ch:FindFirstChildOfClass("Humanoid") end
-    local function getAnimator() local hum = getHum(); return hum and (hum:FindFirstChildOfClass("Animator") or hum) end
+    local function getHum() local ch = getChar() return ch and ch:FindFirstChildOfClass("Humanoid") end
+    local function getAnimator() local hum = getHum() return hum and (hum:FindFirstChildOfClass("Animator") or hum) end
 
     local function applySprintVisibility()
         local gui = PlayerGui:FindFirstChild(InfiniteStamina.CRAWL_GUI); if not gui then return end
@@ -1276,6 +835,11 @@ do
         else btn.Visible = InfiniteStamina.hulkSprintWasVisible end
     end
 
+    task.spawn(function() while alive do task.wait(0.5)
+        if InfiniteStamina.enabled or InfiniteStamina.sprintBtnRef then applySprintVisibility() end
+        if InfiniteStamina.enabled or InfiniteStamina.hulkSprintBtnRef then applyHulkSprintVisibility() end
+    end end)
+
     local function tryBindCrawlButton()
         local gui = PlayerGui:FindFirstChild(InfiniteStamina.CRAWL_GUI); if not gui then return false end
         local btn = gui:FindFirstChild(InfiniteStamina.CRAWL_BTN); if not btn then return false end
@@ -1292,11 +856,11 @@ do
         return true
     end
     task.spawn(function() while not tryBindCrawlButton() do task.wait(1) end end)
+
     PlayerGui.ChildAdded:Connect(function(child)
         if child.Name == InfiniteStamina.CRAWL_GUI then task.wait(0.5); tryBindCrawlButton(); applySprintVisibility()
         elseif child.Name == InfiniteStamina.HULK_GUI then task.wait(0.5); applyHulkSprintVisibility() end
     end)
-    task.spawn(function() while alive do task.wait(0.5); applyHulkSprintVisibility() end end)
 
     local function ensureRunTrack()
         if InfiniteStamina.runTrack then return end
@@ -1319,11 +883,11 @@ do
     end
 
     RunService.RenderStepped:Connect(function(dt)
-        if not InfiniteStamina.enabled then stopRun(0.05); return end
+        if not InfiniteStamina.enabled then stopRun(0.05) return end
         local ch = getChar(); local hum = getHum()
-        if not ch or not hum then stopRun(0.05); return end
+        if not ch or not hum then stopRun(0.05) return end
         ensureRunTrack()
-        if hum.MoveDirection.Magnitude <= 0.1 then stopRun(0.05); return end
+        if hum.MoveDirection.Magnitude <= 0.1 then stopRun(0.05) return end
         local extra = math.max(0, InfiniteStamina.TARGET_SPEED - hum.WalkSpeed)
         if extra > 0 then pcall(function() ch:TranslateBy(hum.MoveDirection * (extra * dt)) end) end
         if hum.WalkSpeed > InfiniteStamina.CRAWL_SPEED and tick() < InfiniteStamina.crawlTouchUntil then
@@ -1331,7 +895,7 @@ do
         end
         local byTouch = tick() < InfiniteStamina.crawlTouchUntil
         local bySpeed = hum.WalkSpeed > 0 and hum.WalkSpeed <= InfiniteStamina.CRAWL_SPEED
-        if byTouch or bySpeed then stopRun(0.05); return end
+        if byTouch or bySpeed then stopRun(0.05) return end
         playRun(0.1)
     end)
 
@@ -1344,8 +908,9 @@ do
     function InfiniteStamina.disable() InfiniteStamina.enabled = false; stopRun(0.05); InfiniteStamina.crawlTouchUntil = 0; applySprintVisibility(); applyHulkSprintVisibility() end
 end
 
-local PlayerState = { jumpEnabled = false, speedPower = false, jumpPower = 50, tpSpeed = 3 }
-local function getHumanoid() local ch = LocalPlayer.Character; return ch and ch:FindFirstChildOfClass("Humanoid") end
+-- ---- PlayerState (Jump/Speed) ----
+local PlayerState = { jumpEnabled=false, speedPower=false, jumpPower=50, tpSpeed=3 }
+local function getHumanoid() local ch = LocalPlayer.Character return ch and ch:FindFirstChildOfClass("Humanoid") end
 local function applyPlayerState()
     local hum = getHumanoid(); if not hum then return end
     if PlayerState.jumpEnabled then
@@ -1358,12 +923,17 @@ RunService.Heartbeat:Connect(function()
     local ch = LocalPlayer.Character; if not ch then return end
     local hum = ch:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return end
-    if hum.MoveDirection.Magnitude > 0 then pcall(function() ch:TranslateBy(hum.MoveDirection * PlayerState.tpSpeed) end) end
+    if hum.MoveDirection.Magnitude > 0 then
+        pcall(function() ch:TranslateBy(hum.MoveDirection * PlayerState.tpSpeed) end)
+    end
 end)
 LocalPlayer.CharacterAdded:Connect(function() task.wait(0.5); applyPlayerState() end)
 
-local AntiRagdoll = { enabled = false, forceWalkSpeed = 16, forceState = true }
-local AR_MOTOR_NAMES = { RootJoint=true, Neck=true, ["Left Shoulder"]=true, ["Right Shoulder"]=true, ["Left Hip"]=true, ["Right Hip"]=true, Waist=true }
+-- ---- AntiRagdoll ----
+local AntiRagdoll = { enabled=false, forceWalkSpeed=16, forceState=true }
+local AR_MOTOR_NAMES = { RootJoint=true, Neck=true,
+    ["Left Shoulder"]=true, ["Right Shoulder"]=true,
+    ["Left Hip"]=true, ["Right Hip"]=true, Waist=true }
 local function arFix()
     if not AntiRagdoll.enabled then return end
     local ch = LocalPlayer.Character; if not ch then return end
@@ -1372,8 +942,12 @@ local function arFix()
     if hum.PlatformStand then pcall(function() hum.PlatformStand = false end) end
     if hum.WalkSpeed < 1 then pcall(function() hum.WalkSpeed = AntiRagdoll.forceWalkSpeed end) end
     for _, d in ipairs(ch:GetDescendants()) do
-        if d:IsA("Motor6D") and d.Enabled == false and AR_MOTOR_NAMES[d.Name] then pcall(function() d.Enabled = true end) end
-        if d:IsA("BallSocketConstraint") and d.Name == "__HulkRagdollSocket" and d.Enabled then pcall(function() d.Enabled = false end) end
+        if d:IsA("Motor6D") and d.Enabled == false and AR_MOTOR_NAMES[d.Name] then
+            pcall(function() d.Enabled = true end)
+        end
+        if d:IsA("BallSocketConstraint") and d.Name == "__HulkRagdollSocket" and d.Enabled then
+            pcall(function() d.Enabled = false end)
+        end
     end
     if AntiRagdoll.forceState then
         local st = hum:GetState()
@@ -1388,6 +962,7 @@ RunService.Heartbeat:Connect(arFix)
 function AntiRagdoll.enable() AntiRagdoll.enabled = true end
 function AntiRagdoll.disable() AntiRagdoll.enabled = false end
 
+-- ---- PlayerESP ----
 local PlayerESP = {
     flags = { hulk=false, hulkbuster=false, survivor=false, weapon=false, abilityHighlight=false },
     colors = { Hulk=Color3.fromRGB(60,220,100), Hulkbuster=Color3.fromRGB(255,200,40),
@@ -1422,18 +997,21 @@ end
 local function peClearAll() for p in pairs(PlayerESP.espByPlayer) do peClear(p) end end
 local function peApply(p)
     if p == LocalPlayer then return end
-    local ch = p.Character; if not ch then peClear(p); return end
+    local ch = p.Character
+    if not ch then peClear(p) return end
     local hum = ch:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health <= 0 then peClear(p); return end
+    if not hum or hum.Health <= 0 then peClear(p) return end
     local role = peGetRole(ch); local roleFlag = false
     if role == "Hulk" and PlayerESP.flags.hulk then roleFlag = true end
     if role == "Hulkbuster" and PlayerESP.flags.hulkbuster then roleFlag = true end
     if role == "Survivor" and PlayerESP.flags.survivor then roleFlag = true end
     local weaponFlag = PlayerESP.flags.weapon
-    if not roleFlag and not weaponFlag then peClear(p); return end
+    if not roleFlag and not weaponFlag then peClear(p) return end
     local ragdolled = peIsRagdolled(ch)
     local color = PlayerESP.colors[role] or PlayerESP.colors.Survivor
-    if role == "Survivor" and PlayerESP.flags.abilityHighlight and peHasAbility(p) then color = PlayerESP.colors.SurvivorAbility end
+    if role == "Survivor" and PlayerESP.flags.abilityHighlight and peHasAbility(p) then
+        color = PlayerESP.colors.SurvivorAbility
+    end
     if ragdolled then color = PlayerESP.colors.Ragdoll end
     local hrp = ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChild("Torso") or ch:FindFirstChild("Head")
     if not hrp then return end
@@ -1470,13 +1048,13 @@ local function peApply(p)
         end
     else
         if e then
-            if e.highlight then e.highlight:Destroy(); e.highlight=nil end
-            if e.billboard then e.billboard:Destroy(); e.billboard=nil end
+            if e.highlight then e.highlight:Destroy() e.highlight=nil end
+            if e.billboard then e.billboard:Destroy() e.billboard=nil end
             if not e.weaponHL then PlayerESP.espByPlayer[p]=nil end
         end
     end
     if weaponFlag then
-        if not e then e = {}; PlayerESP.espByPlayer[p]=e end
+        if not e then e = {} PlayerESP.espByPlayer[p]=e end
         local tool = ch:FindFirstChildOfClass("Tool")
         if tool then
             local handle = tool:FindFirstChild("Handle")
@@ -1490,11 +1068,11 @@ local function peApply(p)
                     e.weaponHL = whl
                 end
             end
-        elseif e.weaponHL then
-            e.weaponHL:Destroy(); e.weaponHL=nil
+        else
+            if e.weaponHL then e.weaponHL:Destroy() e.weaponHL=nil end
         end
-    elseif e and e.weaponHL then
-        e.weaponHL:Destroy(); e.weaponHL=nil
+    else
+        if e and e.weaponHL then e.weaponHL:Destroy() e.weaponHL=nil end
     end
 end
 local function peRefresh()
@@ -1504,9 +1082,13 @@ local function peRefresh()
                 task.wait(0.15)
                 local any = PlayerESP.flags.hulk or PlayerESP.flags.hulkbuster or PlayerESP.flags.survivor or PlayerESP.flags.weapon
                 if not any then peClearAll() else
-                    local aliveSet = {}
-                    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then peApply(p); aliveSet[p]=true end end
-                    for p in pairs(PlayerESP.espByPlayer) do if not aliveSet[p] then peClear(p) end end
+                    local a = {}
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer then peApply(p) a[p]=true end
+                    end
+                    for p in pairs(PlayerESP.espByPlayer) do
+                        if not a[p] then peClear(p) end
+                    end
                 end
             end
         end)
@@ -1514,6 +1096,7 @@ local function peRefresh()
 end
 function PlayerESP.setFlag(k, v) PlayerESP.flags[k] = v; peRefresh() end
 
+-- ---- ChanceESP ----
 local ChanceESP = {
     enabled = false, esp = {}, loop = nil,
     colors = { low=Color3.fromRGB(60,220,100), mid=Color3.fromRGB(255,220,60),
@@ -1575,7 +1158,9 @@ local function chanceApply(p)
         pityLbl.TextXAlignment = Enum.TextXAlignment.Center; pityLbl.Parent = bb
         e.pityLbl = pityLbl; ChanceESP.esp[p] = e
     end
-    if e.chanceLbl.TextColor3 ~= color then e.chanceLbl.TextColor3 = color; e.pityLbl.TextColor3 = color end
+    if e.chanceLbl.TextColor3 ~= color then
+        e.chanceLbl.TextColor3 = color; e.pityLbl.TextColor3 = color
+    end
     if isH then e.chanceLbl.Text = "HULK NOW"
     elseif tostring(state):find("BLOCKED") then e.chanceLbl.Text = "BLOCKED"
     else e.chanceLbl.Text = string.format("%.2f%%", chance) end
@@ -1583,18 +1168,25 @@ local function chanceApply(p)
     else e.pityLbl.Text = string.format("pity %d/%d", pity, hardPity) end
 end
 local function chanceTick()
-    local aliveSet = {}
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then chanceApply(p); aliveSet[p]=true end end
-    for p in pairs(ChanceESP.esp) do if not aliveSet[p] then chanceClear(p) end end
+    local a = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then chanceApply(p); a[p] = true end
+    end
+    for p in pairs(ChanceESP.esp) do if not a[p] then chanceClear(p) end end
 end
 function ChanceESP.enable()
     if ChanceESP.enabled then return end
     ChanceESP.enabled = true; chanceTick()
-    ChanceESP.loop = task.spawn(function() while ChanceESP.enabled do task.wait(0.4); if ChanceESP.enabled then pcall(chanceTick) end end end)
+    ChanceESP.loop = task.spawn(function()
+        while ChanceESP.enabled do task.wait(0.4); if ChanceESP.enabled then pcall(chanceTick) end end
+    end)
 end
 function ChanceESP.disable() ChanceESP.enabled = false; chanceClearAll() end
 
-local EspVents = { enabled=false, color=Color3.fromRGB(180,80,255), fillTrans=0.4, outlineTrans=0, scanInterval=3, patterns={"vent","nightlight"}, esp={}, parent=nil, loop=nil }
+-- ---- EspVents ----
+local EspVents = { enabled=false, color=Color3.fromRGB(180,80,255),
+    fillTrans=0.4, outlineTrans=0, scanInterval=3,
+    patterns={"vent","nightlight"}, esp={}, parent=nil, loop=nil }
 local function ventNameMatches(name)
     local n = name:lower()
     for _, p in ipairs(EspVents.patterns) do if n:match(p) then return true end end
@@ -1604,7 +1196,7 @@ local function ventFindParent()
     local fac = Workspace:FindFirstChild("HulkFacility440x340")
     if not fac then
         for _, c in ipairs(Workspace:GetChildren()) do
-            if c:IsA("Model") and c.Name:lower():match("hulkfacility") then fac = c; break end
+            if c:IsA("Model") and c.Name:lower():match("hulkfacility") then fac = c break end
         end
     end
     if not fac then return nil end
@@ -1650,22 +1242,30 @@ function EspVents.enable()
     EspVents.enabled = true
     task.spawn(function() task.wait(0.1); ventRescan() end)
     if not EspVents.loop then
-        EspVents.loop = task.spawn(function() while alive do task.wait(EspVents.scanInterval); if EspVents.enabled then pcall(ventRescan) end end end)
+        EspVents.loop = task.spawn(function()
+            while alive do task.wait(EspVents.scanInterval); if EspVents.enabled then pcall(ventRescan) end end
+        end)
     end
 end
 function EspVents.disable() EspVents.enabled = false; ventClearAll() end
 
-local EspCabinet = { enabled=false, color=Color3.fromRGB(210,170,120), fillTrans=0.35, outlineTrans=0, scanInterval=3, esp={}, loop=nil }
+-- ---- EspCabinet ----
+local EspCabinet = { enabled=false, color=Color3.fromRGB(210,170,120),
+    fillTrans=0.35, outlineTrans=0, scanInterval=3, esp={}, loop=nil }
 local function cabinetFindAll()
     local found, seen = {}, {}
     local furn = Workspace:FindFirstChild("Furniture")
     if furn then
         for _, d in ipairs(furn:GetDescendants()) do
-            if d:IsA("Model") and d.Name == "Closet" and not seen[d] then seen[d]=true; table.insert(found, d) end
+            if d:IsA("Model") and d.Name == "Closet" and not seen[d] then
+                seen[d]=true; table.insert(found, d)
+            end
         end
     end
     for _, d in ipairs(Workspace:GetDescendants()) do
-        if d:IsA("Model") and d.Name == "Closet" and not seen[d] then seen[d]=true; table.insert(found, d) end
+        if d:IsA("Model") and d.Name == "Closet" and not seen[d] then
+            seen[d]=true; table.insert(found, d)
+        end
     end
     return found
 end
@@ -1683,29 +1283,32 @@ local function cabinetApply(inst)
 end
 local function cabinetClearAll()
     for inst in pairs(EspCabinet.esp) do cabinetClearESP(inst) end
-    for _, d in ipairs(Workspace:GetDescendants()) do
-        if d:IsA("Highlight") and d.Name == "BabisCabinetHL" then d:Destroy() end
-    end
 end
 local function cabinetRescan()
-    local closets = cabinetFindAll(); local aliveSet = {}
-    for _, c in ipairs(closets) do aliveSet[c]=true; cabinetApply(c) end
+    local closets = cabinetFindAll(); local a = {}
+    for _, c in ipairs(closets) do a[c]=true; cabinetApply(c) end
     for inst, hl in pairs(EspCabinet.esp) do
-        if not inst.Parent or not aliveSet[inst] then if hl then hl:Destroy() end; EspCabinet.esp[inst] = nil end
+        if not inst.Parent or not a[inst] then if hl then hl:Destroy() end; EspCabinet.esp[inst] = nil end
     end
 end
 function EspCabinet.enable()
     EspCabinet.enabled = true
     task.spawn(function() task.wait(0.1); cabinetRescan() end)
     if not EspCabinet.loop then
-        EspCabinet.loop = task.spawn(function() while alive do task.wait(EspCabinet.scanInterval); if EspCabinet.enabled then pcall(cabinetRescan) end end end)
+        EspCabinet.loop = task.spawn(function()
+            while alive do task.wait(EspCabinet.scanInterval); if EspCabinet.enabled then pcall(cabinetRescan) end end
+        end)
     end
 end
 function EspCabinet.disable() EspCabinet.enabled = false; cabinetClearAll() end
 
-local AntiDebris = { enabled = false, folderName = "HulkDebris", prefixes = {"HulkDebrisChunk", "Debris", "Fragment", "Chunk", "HulkDebris"} }
+-- ---- AntiDebris ----
+local AntiDebris = { enabled = false, folderName = "HulkDebris",
+    prefixes = {"HulkDebrisChunk", "Debris", "Fragment", "Chunk", "HulkDebris"} }
 local function adMatches(name)
-    for _, p in ipairs(AntiDebris.prefixes) do if name:find(p, 1, true) then return true end end
+    for _, p in ipairs(AntiDebris.prefixes) do
+        if name:find(p, 1, true) then return true end
+    end
     return false
 end
 local function adNuke(inst) if inst then pcall(function() inst:Destroy() end) end end
@@ -1729,7 +1332,11 @@ function AntiDebris.enable()
             if f ~= adWatched then
                 if adFolderConn then pcall(function() adFolderConn:Disconnect() end) end
                 adWatched = f
-                if f then adFolderConn = f.ChildAdded:Connect(function(child) if AntiDebris.enabled then adNuke(child) end end) end
+                if f then
+                    adFolderConn = f.ChildAdded:Connect(function(child)
+                        if AntiDebris.enabled then adNuke(child) end
+                    end)
+                end
             end
             task.wait(1)
         end
@@ -1741,12 +1348,12 @@ function AntiDebris.disable()
     adFolderConn = nil; adWatched = nil
 end
 
-local EventLog = {
-    enabled = false, gui = nil, container = nil, entries = {}, hitCooldown = {},
-    cfg = { fadeInTime=0.15, holdTime=2.6, fadeOutTime=0.4, maxLines=6, hitCooldown=1.0 },
+-- ---- EventLog ----
+local EventLog = { enabled = false, gui = nil, container = nil,
+    entries = {}, hitCooldown = {}, conn = nil,
+    cfg = { fadeInTime=0.15, holdTime=2.6, maxLines=6, hitCooldown=1.0 },
     colors = { hulk=Color3.fromRGB(60,220,100), hulkbuster=Color3.fromRGB(255,200,40),
-        survivor=Color3.fromRGB(255,90,90), death=Color3.fromRGB(200,40,40) },
-}
+        survivor=Color3.fromRGB(255,90,90) } }
 local function elGetRole(plr)
     local ch = plr.Character
     if not ch then return "survivor" end
@@ -1819,7 +1426,7 @@ function EventLog.enable()
     lay.SortOrder=Enum.SortOrder.LayoutOrder; lay.Parent=c
     EventLog.entries = {}; EventLog.hitCooldown = {}
     for _, plr in ipairs(Players:GetPlayers()) do elBind(plr) end
-    Players.PlayerAdded:Connect(elBind)
+    EventLog.conn = Players.PlayerAdded:Connect(elBind)
     task.spawn(function()
         while EventLog.enabled do
             task.wait(0.1)
@@ -1837,16 +1444,21 @@ function EventLog.enable()
 end
 function EventLog.disable()
     EventLog.enabled = false
+    if EventLog.conn then EventLog.conn:Disconnect(); EventLog.conn = nil end
     for _, e in ipairs(EventLog.entries) do if e.label.Parent then e.label:Destroy() end end
     EventLog.entries = {}
     if EventLog.gui then EventLog.gui:Destroy(); EventLog.gui = nil end
     EventLog.container = nil
 end
 
-local HulkAlert = { enabled = false, gui = nil, container = nil, titleLbl = nil, infoLbl = nil, barFill = nil, lastStage = nil, pulseT = 0, conn = nil,
+-- ---- HulkAlert ----
+local HulkAlert = { enabled = false, gui = nil, container = nil,
+    titleLbl = nil, infoLbl = nil, barFill = nil, lastStage = nil, pulseT = 0, conn = nil,
     cfg = { safeRange=200, nearbyRange=130, closeRange=60 },
-    colors = { safe=Color3.fromRGB(60,220,100), nearby=Color3.fromRGB(255,220,60), close=Color3.fromRGB(255,140,40), danger=Color3.fromRGB(255,50,50) },
-    labels = { safe="HULK FAR — SAFE", nearby="HULK NEARBY", close="HULK CLOSE", danger="DANGER — HULK ON YOU" } }
+    colors = { safe=Color3.fromRGB(60,220,100), nearby=Color3.fromRGB(255,220,60),
+        close=Color3.fromRGB(255,140,40), danger=Color3.fromRGB(255,50,50) },
+    labels = { safe="HULK FAR — SAFE", nearby="HULK NEARBY",
+        close="HULK CLOSE", danger="DANGER — HULK ON YOU" } }
 local function haIsHulk(plr)
     local ch = plr.Character; if not ch then return false end
     return ch:GetAttribute("IsHulk") == true or ch:GetAttribute("Transforming") == true
@@ -1901,7 +1513,10 @@ function HulkAlert.enable()
     HulkAlert.conn = RunService.RenderStepped:Connect(function(dt)
         if not HulkAlert.enabled then return end
         local plr, dist = haFindHulk()
-        if not plr or not dist then if c.Visible then c.Visible = false end; HulkAlert.lastStage = nil; return end
+        if not plr or not dist then
+            if c.Visible then c.Visible = false end
+            HulkAlert.lastStage = nil; return
+        end
         if not c.Visible then c.Visible = true end
         local stage
         if dist > HulkAlert.cfg.safeRange then stage = "safe"
@@ -1923,14 +1538,16 @@ function HulkAlert.enable()
             HulkAlert.pulseT = HulkAlert.pulseT + dt * 10
             local pulse = 0.5 + 0.5 * math.sin(HulkAlert.pulseT)
             t.TextColor3 = Color3.fromRGB(255, math.floor(50 + pulse*90), math.floor(50 + pulse*90))
-            t.TextSize = math.floor(32 * (1 + pulse*0.08)); i.TextSize = math.floor(18 * (1 + pulse*0.08))
+            t.TextSize = math.floor(32 * (1 + pulse*0.08))
+            i.TextSize = math.floor(18 * (1 + pulse*0.08))
         elseif stage == "close" then
             HulkAlert.pulseT = HulkAlert.pulseT + dt * 6
             local pulse = 0.5 + 0.5 * math.sin(HulkAlert.pulseT)
             t.TextColor3 = Color3.fromRGB(math.floor(240+pulse*15), math.floor(120+pulse*40), math.floor(20+pulse*20))
             t.TextSize = 32; i.TextSize = 18
         else
-            t.TextSize = 32; i.TextSize = 18; t.TextColor3 = color; i.TextColor3 = color
+            t.TextSize = 32; i.TextSize = 18
+            t.TextColor3 = color; i.TextColor3 = color
         end
     end)
 end
@@ -1941,15 +1558,19 @@ function HulkAlert.disable()
     HulkAlert.container = nil; HulkAlert.titleLbl = nil; HulkAlert.infoLbl = nil; HulkAlert.barFill = nil
 end
 
-local Panic = { autoTrigger=false, triggerRadius=45, cooldown=5, topN=10, sampleStep=16, minHulkDist=90,
-    inset=10, offsetY=3, maxYDelta=6, centerBias=1.0, centerRadius=120,
+-- ---- Panic (Escape) ----
+local Panic = { autoTrigger=false, triggerRadius=45, cooldown=5,
+    topN=10, sampleStep=16, minHulkDist=90, inset=10, offsetY=3, maxYDelta=6,
+    centerBias=1.0, centerRadius=120,
     points={}, hulkPos=nil, best=nil, lastTP=0, yRange=nil, center=nil }
 local function panicGetChar() return LocalPlayer.Character end
-local function panicGetHrp() local ch = panicGetChar(); return ch and ch:FindFirstChild("HumanoidRootPart") end
+local function panicGetHrp() local ch = panicGetChar() return ch and ch:FindFirstChild("HumanoidRootPart") end
 local function panicFindFacility()
     local f = Workspace:FindFirstChild("HulkFacility440x340")
     if f then return f end
-    for _, d in ipairs(Workspace:GetChildren()) do if d:IsA("Model") and d.Name:lower():match("hulkfacility") then return d end end
+    for _, d in ipairs(Workspace:GetChildren()) do
+        if d:IsA("Model") and d.Name:lower():match("hulkfacility") then return d end
+    end
     return nil
 end
 local function panicFindFloors()
@@ -1967,7 +1588,9 @@ local function panicComputeYRange(fac)
 end
 local function panicComputeCenter(fac)
     local sum, count = Vector3.zero, 0
-    for _, d in ipairs(fac:GetDescendants()) do if d:IsA("BasePart") then sum = sum + d.Position; count = count + 1 end end
+    for _, d in ipairs(fac:GetDescendants()) do
+        if d:IsA("BasePart") then sum = sum + d.Position; count = count + 1 end
+    end
     if count == 0 then return nil end
     return sum / count
 end
@@ -2015,7 +1638,8 @@ end
 local function panicPickSafe()
     if #Panic.points == 0 then return nil end
     local hrp = panicGetHrp(); if not hrp then return nil end
-    local myPos = hrp.Position; local scored = {}
+    local myPos = hrp.Position
+    local scored = {}
     for _, pt in ipairs(Panic.points) do
         if not Panic.yRange or (pt.pos.Y >= Panic.yRange.min - 5 and pt.pos.Y <= Panic.yRange.max + 5) then
             local hD = Panic.hulkPos and (pt.pos - Panic.hulkPos).Magnitude or 999
@@ -2023,10 +1647,13 @@ local function panicPickSafe()
                 local centerBonus = 0
                 if Panic.center and Panic.centerRadius > 0 then
                     local distToCenter = (pt.pos - Panic.center).Magnitude
-                    if distToCenter < Panic.centerRadius then centerBonus = (Panic.centerRadius - distToCenter) * Panic.centerBias end
+                    if distToCenter < Panic.centerRadius then
+                        centerBonus = (Panic.centerRadius - distToCenter) * Panic.centerBias
+                    end
                 end
                 local myPenalty = math.min((pt.pos - myPos).Magnitude, 250) * 0.05
-                scored[#scored+1] = {pt=pt, score=hD + centerBonus - myPenalty}
+                local score = hD + centerBonus - myPenalty
+                scored[#scored+1] = {pt=pt, score=score}
             end
         end
     end
@@ -2045,7 +1672,11 @@ local function panicDo()
     local pt = panicPickSafe(); if not pt then return false end
     local ch = panicGetChar(); if not ch then return false end
     local ok = pcall(function() ch:PivotTo(CFrame.new(pt.pos)) end)
-    if ok then Panic.lastTP = tick(); Panic.best = pt.pos; showClimbOverlay(1.2); return true end
+    if ok then
+        Panic.lastTP = tick(); Panic.best = pt.pos
+        showClimbOverlay(1.2)
+        return true
+    end
     return false
 end
 task.spawn(function() task.wait(2); panicRescan() end)
@@ -2059,21 +1690,25 @@ end)
 function Panic.setAuto(v) Panic.autoTrigger = v end
 function Panic.fireManual() return panicDo() end
 
+-- ---- Fling ----
 local function flingTargetCFrame(hulkHrp)
     local char = hulkHrp.Parent
-    local torso = char and (char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso") or char:FindFirstChild("LowerTorso"))
+    local torso = char and (char:FindFirstChild("UpperTorso")
+        or char:FindFirstChild("Torso")
+        or char:FindFirstChild("LowerTorso"))
     if torso then return torso.CFrame end
     return hulkHrp.CFrame
 end
 
-local Fling = { running = false, startedAt = 0, tpAt = 0, savedCFrame = nil, phase = "idle", returnsDone = 0, aborted = false, hulkName = "—",
+local Fling = { running = false, startedAt = 0, tpAt = 0, savedCFrame = nil,
+    phase = "idle", returnsDone = 0, aborted = false, hulkName = "—",
     duration = 1.5, linearForce = DEFAULT_FLING_SPEED, maxDrift = 12,
     returnTPs = 4, returnDelay = 0.15, settleDelay = 0.20,
-    spinForce = DEFAULT_FLING_SPEED * FLING_SPIN_MULT, predictOffset = 1, savedHealth = nil }
-
+    spinForce = DEFAULT_FLING_SPEED * FLING_SPIN_MULT,
+    predictOffset = 1, savedHealth = nil }
 local function flingGetChar() return LocalPlayer.Character end
-local function flingGetHum() local ch = flingGetChar(); return ch and ch:FindFirstChildOfClass("Humanoid") end
-local function flingGetHrp() local ch = flingGetChar(); return ch and ch:FindFirstChild("HumanoidRootPart") end
+local function flingGetHum() local ch = flingGetChar() return ch and ch:FindFirstChildOfClass("Humanoid") end
+local function flingGetHrp() local ch = flingGetChar() return ch and ch:FindFirstChild("HumanoidRootPart") end
 local function flingFindHulk()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:GetAttribute("IsHulk") then
@@ -2089,12 +1724,18 @@ local function flingPredictTarget(hulkHrp)
     if offset == 0 then return base end
     local vel = hulkHrp.AssemblyLinearVelocity
     local speed = vel.Magnitude
-    if speed < 0.5 then return base + hulkHrp.CFrame.LookVector * offset end
+    if speed < 0.5 then
+        local look = hulkHrp.CFrame.LookVector
+        return base + look * offset
+    end
     return base + vel.Unit * offset
 end
 local function flingResetSelf()
     local hrp = flingGetHrp(); if not hrp then return end
-    pcall(function() hrp.AssemblyLinearVelocity = Vector3.zero; hrp.AssemblyAngularVelocity = Vector3.zero end)
+    pcall(function()
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end)
 end
 local function flingReturnHome()
     if not Fling.savedCFrame then return end
@@ -2116,12 +1757,14 @@ end
 RunService.Heartbeat:Connect(function()
     if not Fling.running then return end
     local hum = flingGetHum()
-    if hum and Fling.savedHealth and hum.Health < Fling.savedHealth then safeWrite(hum, "Health", Fling.savedHealth) end
-    if not hum or hum.Health <= 0 then flingStop(true); return end
-    if tick() - Fling.startedAt >= Fling.duration then flingStop(); return end
+    if hum and Fling.savedHealth and hum.Health < Fling.savedHealth then
+        hum.Health = Fling.savedHealth
+    end
+    if not hum or hum.Health <= 0 then flingStop(true) return end
+    if tick() - Fling.startedAt >= Fling.duration then flingStop() return end
     local myHrp = flingGetHrp(); if not myHrp then return end
     local hulkHrp, hulkPlayer = flingFindHulk()
-    if not hulkHrp then Fling.hulkName = "no hulk"; return end
+    if not hulkHrp then Fling.hulkName = "no hulk" return end
     Fling.hulkName = hulkPlayer.Name
     local ch = flingGetChar(); if not ch then return end
     local targetPos = flingPredictTarget(hulkHrp)
@@ -2138,9 +1781,16 @@ RunService.Heartbeat:Connect(function()
         Fling.phase = "force"
     end
     if Fling.phase == "force" then
-        if distToPred > Fling.maxDrift then pcall(function() ch:PivotTo(CFrame.new(targetPos)) end); flingResetSelf() end
-        if distToReal > Fling.maxDrift * 2 then pcall(function() ch:PivotTo(CFrame.new(targetPos)) end); flingResetSelf() end
-        pcall(function() myHrp.AssemblyLinearVelocity = Vector3.zero; myHrp.AssemblyAngularVelocity = Vector3.zero end)
+        if distToPred > Fling.maxDrift then
+            pcall(function() ch:PivotTo(CFrame.new(targetPos)) end); flingResetSelf()
+        end
+        if distToReal > Fling.maxDrift * 2 then
+            pcall(function() ch:PivotTo(CFrame.new(targetPos)) end); flingResetSelf()
+        end
+        pcall(function()
+            myHrp.AssemblyLinearVelocity = Vector3.zero
+            myHrp.AssemblyAngularVelocity = Vector3.zero
+        end)
         local f = Fling.linearForce; local s = Fling.spinForce
         pcall(function()
             myHrp.AssemblyLinearVelocity = Vector3.new(f, f * 0.05, f)
@@ -2151,7 +1801,7 @@ end)
 function Fling.fire()
     if Fling.running then return false end
     local hrp = flingGetHrp(); if not hrp then return false end
-    local hulkHrp = flingFindHulk(); if not hulkHrp then notify("Kill Hulk", "No Hulk present", 2, "warn"); return false end
+    local hulkHrp = flingFindHulk(); if not hulkHrp then return false end
     Fling.savedCFrame = hrp.CFrame
     local hum = flingGetHum()
     if hum then Fling.savedHealth = hum.MaxHealth end
@@ -2161,9 +1811,11 @@ function Fling.fire()
     return true
 end
 
+-- ---- AutoKill ----
 local AutoKill = {
     enabled = false, cycles = 4, cycleDelay = 0.35, flingBurst = 0.40,
-    burstForce = DEFAULT_FLING_SPEED, burstSpin = DEFAULT_FLING_SPEED * FLING_SPIN_MULT,
+    burstForce = DEFAULT_FLING_SPEED,
+    burstSpin = DEFAULT_FLING_SPEED * FLING_SPIN_MULT,
     pinMaxDist = 8, overlayDuration = 6.0, onlySurvivor = true,
     survivorTeamNames = { "Survivors", "Survivor", "Players", "Blue" },
     lobbyTeamNames = { "Lobby", "Spectators", "Waiting", "Spectator" },
@@ -2171,6 +1823,7 @@ local AutoKill = {
     originalCFrame = nil, lastTriggerAt = 0, cooldown = 3.0,
     savedHealth = nil, _charsWatched = setmetatable({}, { __mode = "k" }),
 }
+
 local function autoKillIsSurvivor()
     local team = LocalPlayer.Team
     if team and team.Name then
@@ -2187,6 +1840,7 @@ local function autoKillIsSurvivor()
     end
     return false
 end
+
 local function autoKillBurst(targetChar)
     local ch = LocalPlayer.Character
     local myHrp = ch and ch:FindFirstChild("HumanoidRootPart")
@@ -2196,30 +1850,41 @@ local function autoKillBurst(targetChar)
     while tick() - burstStart < AutoKill.flingBurst do
         if not AutoKill.enabled then break end
         if not ch.Parent then break end
-        if hum and AutoKill.savedHealth and hum.Health < AutoKill.savedHealth then safeWrite(hum, "Health", AutoKill.savedHealth) end
+        if hum and AutoKill.savedHealth and hum.Health < AutoKill.savedHealth then
+            hum.Health = AutoKill.savedHealth
+        end
         local tgtHrp = targetChar:FindFirstChild("HumanoidRootPart")
         myHrp = ch:FindFirstChild("HumanoidRootPart")
         if not tgtHrp or not myHrp then break end
-        local targetTorso = targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("LowerTorso")
+        local targetTorso = targetChar:FindFirstChild("UpperTorso")
+            or targetChar:FindFirstChild("Torso")
+            or targetChar:FindFirstChild("LowerTorso")
         local insideCFrame = targetTorso and targetTorso.CFrame or tgtHrp.CFrame
         local d = (myHrp.Position - tgtHrp.Position).Magnitude
-        if d > AutoKill.pinMaxDist then pcall(function() ch:PivotTo(insideCFrame) end) end
+        if d > AutoKill.pinMaxDist then
+            pcall(function() ch:PivotTo(insideCFrame) end)
+        end
         pcall(function()
-            myHrp.AssemblyLinearVelocity = Vector3.new(AutoKill.burstForce, AutoKill.burstForce * 0.05, AutoKill.burstForce)
-            myHrp.AssemblyAngularVelocity = Vector3.new(AutoKill.burstSpin, AutoKill.burstSpin, AutoKill.burstSpin)
+            myHrp.AssemblyLinearVelocity = Vector3.new(
+                AutoKill.burstForce, AutoKill.burstForce * 0.05, AutoKill.burstForce)
+            myHrp.AssemblyAngularVelocity = Vector3.new(
+                AutoKill.burstSpin, AutoKill.burstSpin, AutoKill.burstSpin)
         end)
         task.wait()
     end
 end
+
 local function autoKillRun(targetChar, targetName)
     if AutoKill.running then return end
     if tick() - AutoKill.lastTriggerAt < AutoKill.cooldown then return end
     AutoKill.lastTriggerAt = tick()
     if AutoKill.onlySurvivor and not autoKillIsSurvivor() then return end
-    AutoKill.running = true; AutoKill.cyclesDone = 0; AutoKill.targetName = targetName
+    AutoKill.running = true
+    AutoKill.cyclesDone = 0
+    AutoKill.targetName = targetName
     local ch = LocalPlayer.Character
     local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
-    if not hrp then AutoKill.running = false; return end
+    if not hrp then AutoKill.running = false return end
     AutoKill.originalCFrame = hrp.CFrame
     local hum = ch:FindFirstChildOfClass("Humanoid")
     if hum then AutoKill.savedHealth = hum.MaxHealth end
@@ -2231,7 +1896,9 @@ local function autoKillRun(targetChar, targetName)
             if not ch or not ch.Parent then break end
             local tgtHrp = targetChar:FindFirstChild("HumanoidRootPart")
             if not tgtHrp then break end
-            local targetTorso = targetChar:FindFirstChild("UpperTorso") or targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("LowerTorso")
+            local targetTorso = targetChar:FindFirstChild("UpperTorso")
+                or targetChar:FindFirstChild("Torso")
+                or targetChar:FindFirstChild("LowerTorso")
             local insideCFrame = targetTorso and targetTorso.CFrame or tgtHrp.CFrame
             pcall(function() ch:PivotTo(insideCFrame) end)
             task.wait(0.08)
@@ -2240,30 +1907,42 @@ local function autoKillRun(targetChar, targetName)
                 for r = 1, 4 do
                     pcall(function() ch:PivotTo(AutoKill.originalCFrame) end)
                     local h2 = ch:FindFirstChild("HumanoidRootPart")
-                    if h2 then pcall(function() h2.AssemblyLinearVelocity = Vector3.zero; h2.AssemblyAngularVelocity = Vector3.zero end) end
+                    if h2 then
+                        pcall(function()
+                            h2.AssemblyLinearVelocity = Vector3.zero
+                            h2.AssemblyAngularVelocity = Vector3.zero
+                        end)
+                    end
                     local hum2 = ch:FindFirstChildOfClass("Humanoid")
-                    if hum2 and AutoKill.savedHealth and hum2.Health < AutoKill.savedHealth then safeWrite(hum2, "Health", AutoKill.savedHealth) end
+                    if hum2 and AutoKill.savedHealth and hum2.Health < AutoKill.savedHealth then
+                        hum2.Health = AutoKill.savedHealth
+                    end
                     task.wait(0.12)
                 end
             end
             AutoKill.cyclesDone = i
             task.wait(AutoKill.cycleDelay)
         end
-        AutoKill.running = false; AutoKill.savedHealth = nil
+        AutoKill.running = false
+        AutoKill.savedHealth = nil
     end)
 end
+
 local function autoKillWatchChar(c, plr)
     if not c or AutoKill._charsWatched[c] then return end
     AutoKill._charsWatched[c] = true
     c.AttributeChanged:Connect(function(name)
         if name ~= "Transforming" then return end
-        if not AutoKill.enabled or AutoKill.running or plr == LocalPlayer then return end
+        if not AutoKill.enabled then return end
+        if AutoKill.running then return end
+        if plr == LocalPlayer then return end
         if c:GetAttribute("Transforming") == true then
             if not autoKillIsSurvivor() then return end
             autoKillRun(c, plr.Name)
         end
     end)
 end
+
 local function autoKillWatchPlayer(plr)
     if not plr then return end
     if plr.Character then autoKillWatchChar(plr.Character, plr) end
@@ -2273,9 +1952,13 @@ for _, plr in ipairs(Players:GetPlayers()) do autoKillWatchPlayer(plr) end
 Players.PlayerAdded:Connect(autoKillWatchPlayer)
 function AutoKill.setEnabled(v)
     AutoKill.enabled = v and true or false
-    if not AutoKill.enabled then AutoKill.running = false; AutoKill.savedHealth = nil end
+    if not AutoKill.enabled then
+        AutoKill.running = false
+        AutoKill.savedHealth = nil
+    end
 end
 
+-- ---- Doors ----
 local Doors = { enabled=false, invisible=true, noCollide=true, scanInterval=4,
     keywords={"door","gate","exit","porta","entrance","hinge","doorway","portal"},
     originals={}, loop=nil, addConn=nil }
@@ -2306,7 +1989,10 @@ end
 local function doorRestore()
     for part, o in pairs(Doors.originals) do
         if part and part.Parent then
-            pcall(function() part.Transparency=o.transp; part.CanCollide=o.cc; part.CanQuery=o.cq; part.CanTouch=o.ct end)
+            pcall(function()
+                part.Transparency=o.transp; part.CanCollide=o.cc
+                part.CanQuery=o.cq; part.CanTouch=o.ct
+            end)
         end
     end
     Doors.originals = {}
@@ -2315,14 +2001,20 @@ local function doorScan()
     for _, d in ipairs(Workspace:GetDescendants()) do
         if d:IsA("BasePart") and doorNameMatches(d.Name) then doorApply(d) end
         if d:IsA("Model") and doorNameMatches(d.Name) then
-            for _, ch in ipairs(d:GetDescendants()) do if ch:IsA("BasePart") then doorApply(ch) end end
+            for _, ch in ipairs(d:GetDescendants()) do
+                if ch:IsA("BasePart") then doorApply(ch) end
+            end
         end
     end
 end
 function Doors.enable()
     Doors.enabled = true
     task.spawn(function() task.wait(0.1); doorScan() end)
-    if not Doors.loop then Doors.loop = task.spawn(function() while alive do task.wait(Doors.scanInterval); if Doors.enabled then pcall(doorScan) end end end) end
+    if not Doors.loop then
+        Doors.loop = task.spawn(function()
+            while alive do task.wait(Doors.scanInterval); if Doors.enabled then pcall(doorScan) end end
+        end)
+    end
     if not Doors.addConn then
         Doors.addConn = Workspace.DescendantAdded:Connect(function(d)
             if not Doors.enabled then return end
@@ -2332,559 +2024,1321 @@ function Doors.enable()
 end
 function Doors.disable() Doors.enabled = false; doorRestore() end
 
-local HulkAttack = ReplicatedStorage:FindFirstChild("HulkAttack")
-local HulkSkinSystem = ReplicatedStorage:FindFirstChild("HulkSkinSystem")
-if not HulkSkinSystem then
-    task.spawn(function() HulkSkinSystem = ReplicatedStorage:WaitForChild("HulkSkinSystem", 30) end)
-end
-local function skinRemote(name)
-    if HulkSkinSystem then return HulkSkinSystem:FindFirstChild(name) end
-end
+-- ====================================================================================================
+-- JANELA
+-- ====================================================================================================
+gui = new("ScreenGui", {
+    Name = "MeuRetangulo", ResetOnSpawn = false, IgnoreGuiInset = true,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = PlayerGui,
+})
 
-local SharedData = { money = 0, cost = 1000, pity = 0, pityLimit = 150,
-    owned = {}, equipped = nil, missions = {}, dailyCanClaim = false, lastData = nil }
+local root = new("Frame", {
+    Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+    Size = UDim2.fromOffset(winW, winH), BackgroundTransparency = 1, Parent = gui,
+})
+local fitScale = new("UIScale", { Parent = root })
 
-local AutoPunch = { running = false, count = 0, rateClock = 0, rateCount = 0 }
-local function getLocalRoot()
-    local c = LocalPlayer.Character
-    if not c then return nil end
-    return c:FindFirstChild("HumanoidRootPart")
+local function updateFit()
+    local vp = gui.AbsoluteSize
+    if vp.X < 50 or vp.Y < 50 then vp = viewport() end
+    fitScale.Scale = math.clamp(math.min(vp.X * 0.92 / winW, vp.Y * 0.90 / winH), 0.5, 1.25)
 end
-RunService.RenderStepped:Connect(function(dt)
-    if not AutoPunch.running then
-        if AutoPunch.rateClock > 0 then AutoPunch.rateClock = 0; AutoPunch.rateCount = 0 end
-        return
+updateFit()
+bind(gui:GetPropertyChangedSignal("AbsoluteSize"), updateFit)
+
+local shadowLayers = {}
+for i = 1, 7 do
+    local s = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 8),
+        Size = UDim2.new(1, i * 7, 1, i * 7), BackgroundColor3 = BLACK, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 0, Parent = root,
+    })
+    corner(s, CORNER + i * 3)
+    shadowLayers[i] = s
+end
+local function setShadow(visible, d)
+    for i, s in ipairs(shadowLayers) do
+        apply(s, { BackgroundTransparency = visible and (0.9 + i * 0.0075) or 1 }, d or 0.4, Enum.EasingStyle.Quad)
     end
-    if HulkAttack then
-        local root = getLocalRoot()
-        if root then
-            pcall(function() HulkAttack:FireServer(root.CFrame, Vector3.new(0, 0, 0)) end)
-            AutoPunch.count = AutoPunch.count + 1
-            AutoPunch.rateCount = AutoPunch.rateCount + 1
+end
+
+local canvas = new("CanvasGroup", {
+    Name = "Canvas", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, GroupTransparency = 1, ZIndex = 1, Parent = root,
+})
+corner(canvas, CORNER)
+Theme.bind(canvas, "BackgroundColor3", "bgMain")
+local popScale = new("UIScale", { Scale = 0.86, Parent = canvas })
+new("UIGradient", { Rotation = 135, Color = ColorSequence.new(Color3.fromRGB(255, 255, 255), Color3.fromRGB(208, 208, 218)), Parent = canvas })
+
+local borderFrame = new("Frame", { Name = "Border", Size = UDim2.new(1, -2, 1, -2), Position = UDim2.new(0, 1, 0, 1), BackgroundTransparency = 1, ZIndex = 60, Parent = canvas })
+corner(borderFrame, CORNER - 1)
+local borderStroke = stroke(borderFrame, Theme.c.border, 1.2, 0.05)
+Theme.bind(borderStroke, "Color", "border")
+
+local overlay = new("Frame", { Name = "Overlay", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 100, Parent = canvas })
+
+-- ====================================================================================================
+-- DECORACAO HALLOWEEN
+-- ====================================================================================================
+do
+    if HW.FOG then
+        local fog = new("Frame", {
+            Name = "Fog", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, SIDEBAR_W, 1, 0),
+            Size = UDim2.new(1, -SIDEBAR_W, 0, 120), BackgroundColor3 = Color3.fromRGB(120, 60, 185),
+            BorderSizePixel = 0, ZIndex = 1, Parent = canvas,
+        })
+        local fg = new("UIGradient", {
+            Rotation = 90,
+            Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0.8) }),
+            Parent = fog,
+        })
+        TweenService:Create(fg, TweenInfo.new(4.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Offset = Vector2.new(0, 0.18) }):Play()
+    end
+
+    local decor = new("CanvasGroup", {
+        Name = "Decor", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
+        GroupTransparency = 1, ZIndex = 2, Parent = root,
+    })
+    corner(decor, CORNER)
+    HW.decor = decor
+
+    local function seg(parent, ax, ay, bx, by, thick, color, trans)
+        local dx, dy = bx - ax, by - ay
+        return new("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromOffset((ax + bx) / 2, (ay + by) / 2),
+            Size = UDim2.fromOffset(math.sqrt(dx * dx + dy * dy), thick),
+            Rotation = math.deg(math.atan2(dy, dx)),
+            BackgroundColor3 = color, BackgroundTransparency = trans, BorderSizePixel = 0, ZIndex = 2, Parent = parent,
+        })
+    end
+
+    local WEB, RAD = 130, 5
+    local webCol = Color3.fromRGB(215, 212, 235)
+    local function buildWeb(ax, ay)
+        local holder = new("Frame", {
+            AnchorPoint = Vector2.new(ax, ay), Position = UDim2.fromScale(ax, ay),
+            Size = UDim2.fromOffset(WEB, WEB), BackgroundTransparency = 1, Parent = decor,
+        })
+        local function pt(x, y)
+            return (ax == 0) and x or (WEB - x), (ay == 0) and y or (WEB - y)
         end
-    end
-    AutoPunch.rateClock = AutoPunch.rateClock + dt
-    if AutoPunch.rateClock >= 0.5 then
-        AutoPunch.rateClock = 0; AutoPunch.rateCount = 0
-    end
-end)
-function AutoPunch.setEnabled(v)
-    AutoPunch.running = v and true or false
-    if AutoPunch.running and not HulkAttack then
-        notify("Auto Punch", "HulkAttack remote not found — punch may fail", 2.5, "warn")
-    end
-end
-
-local function readState()
-    local EmoteSpin = skinRemote("EmoteSpin")
-    if EmoteSpin then
-        local ok, res = pcall(function() return EmoteSpin:InvokeServer() end)
-        if ok and type(res) == "table" and res.Data then return res.Data, res.Success end
-    end
-    return nil
-end
-local function absorbState(data)
-    if not data then return end
-    SharedData.lastData = data
-    SharedData.money = data.Money or 0
-    SharedData.cost = data.AbilitySpinCost or 1000
-    SharedData.pity = data.AbilityPity or 0
-    SharedData.pityLimit = data.AbilityPityLimit or 150
-    SharedData.owned = data.OwnedAbilities or {}
-    SharedData.equipped = data.EquippedAbility
-    SharedData.missions = data.Missions or {}
-    SharedData.dailyCanClaim = data.Daily and data.Daily.CanClaim or false
-end
-
-local AutoMission = { enabled = false, interval = 3, running = false }
-local function claimAllMissions()
-    if AutoMission.running then return end
-    AutoMission.running = true
-    if not skinRemote("ClaimMission") and not SharedData.lastData then
-        local data = readState()
-        if data then absorbState(data) end
-    end
-    local ClaimMission = skinRemote("ClaimMission")
-    local ClaimDaily = skinRemote("ClaimDaily")
-    if not ClaimMission and not ClaimDaily then AutoMission.running = false; return end
-
-    local missions = SharedData.missions or {}
-    local idxs = {}
-    for i, m in pairs(missions) do
-        if m.Completed and not m.Claimed then idxs[#idxs + 1] = i end
-    end
-    table.sort(idxs)
-
-    local claimed, gained = 0, 0
-    local before = SharedData.money or 0
-
-    for _, i in ipairs(idxs) do
-        if not AutoMission.enabled then break end
-        local ok, res = pcall(function() return ClaimMission:InvokeServer(i) end)
-        if ok and type(res) == "table" then
-            if res.Data then absorbState(res.Data) end
-            if res.Success == true then claimed = claimed + 1 end
+        local ang = {}
+        for k = 0, RAD - 1 do ang[k] = math.rad(k * 90 / (RAD - 1)) end
+        local ox, oy = pt(0, 0)
+        for k = 0, RAD - 1 do
+            local x2, y2 = pt(math.cos(ang[k]) * WEB, math.sin(ang[k]) * WEB)
+            seg(holder, ox, oy, x2, y2, 1.4, webCol, 0.35)
         end
-        task.wait(0.1)
-    end
-
-    if SharedData.dailyCanClaim and ClaimDaily then
-        local ok, res = pcall(function() return ClaimDaily:InvokeServer() end)
-        if ok and type(res) == "table" and res.Data then absorbState(res.Data) end
-    end
-
-    if #idxs > 0 then
-        gained = (SharedData.money or 0) - before
-        if gained ~= 0 or claimed > 0 then
-            notify("Auto Mission", string.format("+$%d · %d/%d claimed", gained, claimed, #idxs), 2, "success")
-        end
-    end
-    AutoMission.running = false
-end
-task.spawn(function()
-    while alive do
-        task.wait(AutoMission.interval)
-        if AutoMission.enabled then pcall(claimAllMissions) end
-    end
-end)
-function AutoMission.setEnabled(v)
-    AutoMission.enabled = v and true or false
-    if AutoMission.enabled then
-        task.spawn(function() pcall(claimAllMissions) end)
-        notify("Auto Mission", "Started — claiming every " .. AutoMission.interval .. "s", 2, "info")
-    end
-end
-
-local SpinSystem = {
-    running = false, target = nil, attempts = 0, spent = 0,
-    renderAbilities = nil,
-}
-local function spinOnce()
-    local AbilitySpin = skinRemote("AbilitySpin")
-    if not AbilitySpin then return nil end
-    local ok, res = pcall(function() return AbilitySpin:InvokeServer() end)
-    if ok and type(res) == "table" then return res end
-    return nil
-end
-local function canAffordSpin()
-    if (SharedData.money or 0) > 0 and (SharedData.cost or 1000) <= (SharedData.money or 0) then return true end
-    local last = SharedData.lastData
-    if last and (last.AbilitySpins or 0) > 0 then return true end
-    return (SharedData.money or 0) >= (SharedData.cost or 1000)
-end
-local function stopSpin(reason)
-    if not SpinSystem.running then return end
-    SpinSystem.running = false
-    if reason then notify("Spin", "STOP: " .. reason, 2.5, "warn") end
-end
-local function startSpin()
-    if not SpinSystem.target then notify("Spin", "Select a MISSING ability first", 2, "error"); return end
-    if SharedData.owned[SpinSystem.target] then notify("Spin", SpinSystem.target .. " is already owned", 2, "warn"); return end
-    if not canAffordSpin() then notify("Spin", "No spins and no money", 2, "error"); return end
-    SpinSystem.running = true
-    SpinSystem.attempts = 0
-    SpinSystem.spent = 0
-    notify("Spin", "Hunting: " .. SpinSystem.target, 2, "success")
-    task.spawn(function()
-        while SpinSystem.running do
-            if not SpinSystem.target then stopSpin("target removed"); break end
-            if not canAffordSpin() then stopSpin("out of money"); break end
-            if SharedData.owned[SpinSystem.target] then stopSpin("ACQUIRED · " .. SpinSystem.target); break end
-            local prev = SharedData.money or 0
-            local res = spinOnce()
-            if not res then
-                task.wait(1)
-            else
-                if res.Data then absorbState(res.Data) end
-                if res.Success == true then
-                    SpinSystem.attempts = SpinSystem.attempts + 1
-                    local delta = prev - (SharedData.money or prev)
-                    if delta > 0 then SpinSystem.spent = SpinSystem.spent + delta end
-                    if SpinSystem.renderAbilities then pcall(SpinSystem.renderAbilities) end
-                    if SharedData.owned[SpinSystem.target] then
-                        notify("Spin", "★ GOT " .. SpinSystem.target .. " in " .. SpinSystem.attempts .. " spins!", 3, "success")
-                        stopSpin("ACQUIRED · " .. SpinSystem.target)
-                        break
-                    end
-                    task.wait(0.08)
-                else
-                    local msg = tostring(res.Message or "?"):lower()
-                    if msg:find("lobby") then task.wait(2)
-                    elseif msg:find("money") or msg:find("fund") or msg:find("insufficient") then stopSpin("out of money"); break
-                    else task.wait(1) end
-                end
+        for _, r in ipairs({ 32, 62, 95, 128 }) do
+            for k = 0, RAD - 2 do
+                local x1, y1 = math.cos(ang[k]) * r, math.sin(ang[k]) * r
+                local x2, y2 = math.cos(ang[k + 1]) * r, math.sin(ang[k + 1]) * r
+                local mx, my = (x1 + x2) / 2 * 0.88, (y1 + y2) / 2 * 0.88
+                local px1, py1 = pt(x1, y1)
+                local pmx, pmy = pt(mx, my)
+                local px2, py2 = pt(x2, y2)
+                seg(holder, px1, py1, pmx, pmy, 1.1, webCol, 0.45)
+                seg(holder, pmx, pmy, px2, py2, 1.1, webCol, 0.45)
             end
         end
-        if SpinSystem.renderAbilities then pcall(SpinSystem.renderAbilities) end
-    end)
-end
-function SpinSystem.setEnabled(v)
-    if v then startSpin() else stopSpin("manual") end
+    end
+    if HW.WEBS then
+        buildWeb(0, 1)
+        buildWeb(1, 1)
+    end
+
+    if HW.EMOJI and HW.SPIDER then
+        local x = -170
+        local thread = new("Frame", {
+            AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(1, x, 0, 0), Size = UDim2.fromOffset(1, 30),
+            BackgroundColor3 = Color3.fromRGB(215, 212, 235), BackgroundTransparency = 0.45, BorderSizePixel = 0, ZIndex = 3, Parent = decor,
+        })
+        local sp = new("TextLabel", {
+            AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, x, 0, 40), Size = UDim2.fromOffset(34, 34),
+            BackgroundTransparency = 1, Font = FONT_MAIN, Text = HW.SPIDER_E, TextSize = 22, TextColor3 = WHITE, ZIndex = 3, Parent = decor,
+        })
+        task.spawn(function()
+            while alive and sp.Parent do
+                tween(thread, { Size = UDim2.fromOffset(1, 46) }, 1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                tween(sp, { Position = UDim2.new(1, x, 0, 56) }, 1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                task.wait(1.6)
+                if not (alive and sp.Parent) then break end
+                tween(thread, { Size = UDim2.fromOffset(1, 30) }, 1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                tween(sp, { Position = UDim2.new(1, x, 0, 40) }, 1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                task.wait(1.6)
+            end
+        end)
+    end
 end
 
-task.spawn(function()
-    while alive do
-        task.wait(6)
-        if not SpinSystem.running then
-            local data = readState()
-            if data then absorbState(data); if SpinSystem.renderAbilities then pcall(SpinSystem.renderAbilities) end end
-        end
-    end
+-- ====================================================================================================
+-- GRIP
+-- ====================================================================================================
+local grip = new("TextButton", {
+    Name = "ResizeGrip", Size = UDim2.fromOffset(22, 22), AnchorPoint = Vector2.new(1, 1),
+    Position = UDim2.new(1, -4, 1, -4), BackgroundTransparency = 1, Text = "", AutoButtonColor = false,
+    ZIndex = 65, Parent = canvas,
+})
+local gripDots = {}
+for _, d in ipairs({ {14,14}, {8,14}, {14,8}, {2,14}, {8,8}, {14,2} }) do
+    local dot = new("Frame", {
+        Size = UDim2.fromOffset(2, 2), Position = UDim2.fromOffset(d[1], d[2]),
+        BackgroundColor3 = TEXT_MUTED, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 66, Parent = grip,
+    })
+    corner(dot, 1)
+    gripDots[#gripDots + 1] = dot
+end
+grip.MouseEnter:Connect(function()
+    for _, dot in ipairs(gripDots) do tween(dot, { BackgroundColor3 = Theme.c.accent, BackgroundTransparency = 0 }, 0.12) end
+end)
+grip.MouseLeave:Connect(function()
+    for _, dot in ipairs(gripDots) do tween(dot, { BackgroundColor3 = TEXT_MUTED, BackgroundTransparency = 0.3 }, 0.15) end
 end)
 
-local function addAbilityList(parent, order)
-    local wrap = new("Frame", { Name = "Wrap", Size = UDim2.new(1, 0, 0, 220), BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
-    wrap:SetAttribute("Entrance", true)
-    local card = new("Frame", { Name = "Card", Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Theme.c.bgCard, BorderSizePixel = 0, ClipsDescendants = true, Parent = wrap })
-    corner(card, 10)
-    local cardStroke = stroke(card, Theme.c.border, 1, 0)
-    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(212, 212, 218)), Parent = card })
-
-    local title = newLabel(card, "Ability Target", 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -110, 0, 20), Position = UDim2.new(0, 16, 0, 10) })
-    local targetLbl = newLabel(card, "none", 11, FONT_CODE, C_ERROR, { Size = UDim2.new(1, -24, 0, 16), Position = UDim2.new(0, 16, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd })
-
-    local list = new("ScrollingFrame", {
-        Size = UDim2.new(1, -20, 0, 168), Position = UDim2.new(0, 10, 0, 50),
-        BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 2,
-        ScrollBarImageColor3 = Theme.c.accent, ScrollBarImageTransparency = 0.4,
-        CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
-        Parent = card,
+-- ====================================================================================================
+-- RIPPLE / TOOLTIP / POPUP
+-- ====================================================================================================
+local function ripple(card, input)
+    local sc = fitScale.Scale
+    local abs = card.AbsolutePosition
+    local size = card.AbsoluteSize
+    local x, y = size.X / sc / 2, size.Y / sc / 2
+    if input and input.Position then
+        x = (input.Position.X - abs.X) / sc
+        y = (input.Position.Y - abs.Y) / sc
+    end
+    local r = new("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(0, 0),
+        BackgroundColor3 = WHITE, BackgroundTransparency = 0.82, BorderSizePixel = 0, ZIndex = 2, Parent = card,
     })
-    new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
+    corner(r, 999)
+    local d = (size.X / sc) * 2.2
+    tween(r, { Size = UDim2.fromOffset(d, d), BackgroundTransparency = 1 }, 0.6, Enum.EasingStyle.Quart)
+    Debris:AddItem(r, 0.7)
+end
 
-    local function render()
-        for _, c in ipairs(list:GetChildren()) do
-            if c:IsA("TextButton") then c:Destroy() end
-        end
-        local names = {}
-        for n in pairs(SharedData.owned or {}) do names[#names + 1] = n end
-        table.sort(names)
+local Tooltip = {}
+do
+    local tip = new("TextLabel", {
+        Name = "Tooltip", BackgroundColor3 = Theme.c.bgMain, BackgroundTransparency = 1, TextTransparency = 1,
+        Font = FONT_MAIN, TextSize = 11, TextColor3 = TEXT, Text = "", BorderSizePixel = 0, ZIndex = 200,
+        Size = UDim2.fromOffset(60, 22), AnchorPoint = Vector2.new(0.5, 0), Visible = false, Parent = overlay,
+    })
+    corner(tip, 6)
+    local tStroke = stroke(tip, Theme.c.border, 1, 1)
+    local token = 0
+    function Tooltip.show(text, anchor)
+        token = token + 1
+        local my = token
+        task.delay(0.35, function()
+            if token ~= my or not anchor.Parent then return end
+            local sc = fitScale.Scale
+            local w = 60
+            pcall(function() w = TextService:GetTextSize(text, 11, FONT_MAIN, Vector2.new(400, 30)).X + 18 end)
+            local a, o = anchor.AbsolutePosition, overlay.AbsolutePosition
+            local cx = (a.X - o.X) / sc + anchor.AbsoluteSize.X / sc / 2
+            local y = (a.Y - o.Y) / sc + anchor.AbsoluteSize.Y / sc + 8
+            cx = math.clamp(cx, w / 2 + 6, winW - w / 2 - 6)
+            tip.Text = text
+            tip.Size = UDim2.fromOffset(w, 22)
+            tip.Position = UDim2.fromOffset(cx, y + 4)
+            tip.BackgroundColor3 = Theme.c.bgMain
+            tStroke.Color = Theme.c.border
+            tip.Visible = true
+            tween(tip, { Position = UDim2.fromOffset(cx, y), BackgroundTransparency = 0.05, TextTransparency = 0 }, 0.15)
+            tween(tStroke, { Transparency = 0.2 }, 0.15)
+        end)
+    end
+    function Tooltip.hide()
+        token = token + 1
+        tween(tip, { BackgroundTransparency = 1, TextTransparency = 1 }, 0.1)
+        tween(tStroke, { Transparency = 1 }, 0.1)
+        local my = token
+        task.delay(0.12, function() if token == my then tip.Visible = false end end)
+    end
+end
 
-        if SpinSystem.target then
-            targetLbl.Text = "target: " .. SpinSystem.target
-            targetLbl.TextColor3 = Theme.c.accent
-        else
-            targetLbl.Text = "target: NONE — click a MISSING ability"
-            targetLbl.TextColor3 = C_ERROR
-        end
+local Popup = { current = nil }
+function Popup.close()
+    local cur = Popup.current
+    if not cur then return end
+    Popup.current = nil
+    if cur.arrow and cur.arrow.Parent then tween(cur.arrow, { Rotation = 0 }, 0.2) end
+    pcall(function() cur.backdrop:Destroy() end)
+    local f = cur.frame
+    if f and f.Parent then
+        tween(f, { Size = UDim2.new(0, cur.w, 0, 0) }, 0.16, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+        Debris:AddItem(f, 0.2)
+    end
+end
 
-        if #names == 0 then
-            new("TextLabel", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, Text = "Loading ability data...", TextColor3 = TEXT_MUTED, Font = FONT_MAIN, TextSize = 11, ZIndex = 6, Parent = list })
-            return
-        end
-
-        for i, name in ipairs(names) do
-            local owned = SharedData.owned[name] == true
-            local equipped = (SharedData.equipped == name)
-            local isTarget = (SpinSystem.target == name)
+function Popup.open(anchor, spec)
+    if Popup.current and Popup.current.anchor == anchor then Popup.close() return end
+    Popup.close()
+    Tooltip.hide()
+    local c = Theme.c
+    local sc = fitScale.Scale
+    local aAbs, aSize, oAbs = anchor.AbsolutePosition, anchor.AbsoluteSize, overlay.AbsolutePosition
+    local aw, ah = aSize.X / sc, aSize.Y / sc
+    local ax, ay = (aAbs.X - oAbs.X) / sc, (aAbs.Y - oAbs.Y) / sc
+    local options = spec.options or {}
+    local ROW_H, GAP, HEAD_H, PAD = 26, 2, 22, 6
+    local rows = math.max(#options, 1)
+    local visible = math.min(rows, 6)
+    local listH = visible * (ROW_H + GAP) - GAP
+    local totalH = PAD + HEAD_H + 5 + listH + PAD
+    local totalW = math.max(aw, 156)
+    local px = math.clamp(ax + aw - totalW, 8, winW - totalW - 8)
+    local spaceBelow = winH - (ay + ah) - 12
+    local spaceAbove = ay - 12
+    local openUp = spaceBelow < totalH and spaceAbove > spaceBelow
+    local backdrop = new("TextButton", { Name = "PopupBackdrop", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 1, Parent = overlay })
+    backdrop.MouseButton1Click:Connect(Popup.close)
+    local pf = new("Frame", {
+        Name = "Popup", BackgroundColor3 = c.bgCard, BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 5,
+        Size = UDim2.new(0, totalW, 0, 0), Parent = overlay,
+    })
+    corner(pf, 10)
+    stroke(pf, c.accent, 1.2, 0.45)
+    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(205, 205, 212)), Parent = pf })
+    if openUp then
+        pf.AnchorPoint = Vector2.new(0, 1)
+        pf.Position = UDim2.fromOffset(px, ay - 6)
+    else
+        pf.AnchorPoint = Vector2.new(0, 0)
+        pf.Position = UDim2.fromOffset(px, ay + ah + 6)
+    end
+    newLabel(pf, spec.header or "Options", 10, FONT_STRONG, TEXT_DIM, { Size = UDim2.new(1, -20, 0, HEAD_H), Position = UDim2.new(0, 12, 0, PAD), ZIndex = 6 })
+    new("Frame", { Size = UDim2.new(1, -20, 0, 1), Position = UDim2.new(0, 10, 0, PAD + HEAD_H + 1), BackgroundColor3 = c.border, BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 6, Parent = pf })
+    local list = new("ScrollingFrame", {
+        Size = UDim2.new(1, -12, 0, listH), Position = UDim2.new(0, 6, 0, PAD + HEAD_H + 5), BackgroundTransparency = 1,
+        BorderSizePixel = 0, ScrollBarThickness = 2, ScrollBarImageColor3 = c.accent, ScrollBarImageTransparency = 0.4,
+        CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ZIndex = 6, Parent = pf,
+    })
+    new("UIListLayout", { Padding = UDim.new(0, GAP), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
+    if #options == 0 then
+        newLabel(list, spec.empty or "Nothing here", 11, FONT_MAIN, TEXT_MUTED, {
+            Size = UDim2.new(1, 0, 0, ROW_H), TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 7,
+        })
+    else
+        for i, name in ipairs(options) do
+            local isSel = (name == spec.selected)
             local row = new("TextButton", {
-                Size = UDim2.new(1, -4, 0, 30),
-                BackgroundColor3 = isTarget and Theme.c.hover or Theme.c.bgMain,
-                BackgroundTransparency = isTarget and 0 or 0.35,
-                Text = "", AutoButtonColor = false, LayoutOrder = i, ZIndex = 6, Parent = list,
+                Size = UDim2.new(1, -4, 0, ROW_H), BackgroundColor3 = isSel and c.hover or c.bgMain, BackgroundTransparency = isSel and 0 or 0.4,
+                Text = "", AutoButtonColor = false, LayoutOrder = i, ZIndex = 7, Parent = list,
             })
             corner(row, 6)
-            stroke(row, isTarget and Theme.c.accent or (owned and C_SUCCESS or Theme.c.border), isTarget and 1.5 or 1, 0.3)
-            local dot = new("Frame", { Size = UDim2.fromOffset(8, 8), Position = UDim2.new(0, 10, 0.5, -4), BackgroundColor3 = owned and C_SUCCESS or C_LOCKED, BorderSizePixel = 0, ZIndex = 7, Parent = row })
-            corner(dot, 4)
-            newLabel(row, name, 11, FONT_STRONG, owned and TEXT or Color3.fromRGB(120, 120, 128), { Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 24, 0, 0), ZIndex = 7 })
-            local badgeText = equipped and "EQUIPPED" or (owned and "OWNED" or "MISSING")
-            local badgeCol  = equipped and Theme.c.accent or (owned and C_SUCCESS or C_ERROR)
-            local badge = new("TextLabel", { Size = UDim2.fromOffset(70, 18), Position = UDim2.new(1, -78, 0.5, -9), BackgroundColor3 = owned and Color3.fromRGB(20, 40, 25) or Color3.fromRGB(30, 20, 20), Text = badgeText, TextColor3 = badgeCol, Font = FONT_STRONG, TextSize = 8, BorderSizePixel = 0, ZIndex = 7, Parent = row })
-            corner(badge, 4)
-
-            row.MouseEnter:Connect(function()
-                if not isTarget then tween(row, { BackgroundTransparency = 0, BackgroundColor3 = Theme.c.hover }, 0.1) end
-            end)
-            row.MouseLeave:Connect(function()
-                if not isTarget then tween(row, { BackgroundTransparency = 0.35, BackgroundColor3 = Theme.c.bgMain }, 0.12) end
-            end)
+            stroke(row, isSel and c.accent or c.border, 1, isSel and 0.2 or 0.5)
+            newLabel(row, name, 11, isSel and FONT_STRONG or FONT_MAIN, isSel and c.accent or TEXT, {
+                Size = UDim2.new(1, -34, 1, 0), Position = UDim2.new(0, 10, 0, 0), TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 8,
+            })
+            if isSel then
+                local dot = new("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(6, 6), BackgroundColor3 = c.accent, BorderSizePixel = 0, ZIndex = 8, Parent = row })
+                corner(dot, 3)
+            end
             row.MouseButton1Click:Connect(function()
-                if SpinSystem.running then
-                    notify("Spin", "Stop the spin before changing target", 2, "warn")
-                    return
-                end
-                SpinSystem.target = name
-                notify("Spin", "Target: " .. name, 2, "info")
-                render()
+                playSound(SOUND_TAB, 0.35)
+                Popup.close()
+                if spec.onPick then spec.onPick(name) end
             end)
         end
     end
-    SpinSystem.renderAbilities = render
-    task.spawn(function() task.wait(0.5); pcall(render) end)
-    task.spawn(function()
-        while alive do
-            task.wait(6)
-            if list.Parent then pcall(render) end
-        end
+    tween(pf, { Size = UDim2.new(0, totalW, 0, totalH) }, 0.26, Enum.EasingStyle.Back)
+    if spec.arrow then tween(spec.arrow, { Rotation = 180 }, 0.22) end
+    Popup.current = { frame = pf, backdrop = backdrop, anchor = anchor, arrow = spec.arrow, w = totalW }
+end
+
+-- ====================================================================================================
+-- CABECALHO
+-- ====================================================================================================
+local header = new("Frame", {
+    Name = "Header", Size = UDim2.new(1, 0, 0, HEADER_H), BackgroundColor3 = Theme.c.bgHeader, BorderSizePixel = 0,
+    ClipsDescendants = true, ZIndex = 4, Parent = canvas,
+})
+Theme.bind(header, "BackgroundColor3", "bgHeader")
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(206, 206, 214)), Parent = header })
+
+local headerShine = new("Frame", {
+    Name = "HeaderShine", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, -UI_SHINE.Width - 20, 0.5, 0),
+    Size = UDim2.new(0, UI_SHINE.Width, UI_SHINE.Height, 0), BackgroundColor3 = WHITE, BackgroundTransparency = UI_SHINE.Transparency,
+    BorderSizePixel = 0, Rotation = UI_SHINE.Angle, ZIndex = 3, Parent = header,
+})
+corner(headerShine, math.ceil(UI_SHINE.Height / 2))
+new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = headerShine })
+
+local headerLine = new("Frame", {
+    Name = "HeaderGlow", Size = UDim2.new(1, 0, 0, 2), Position = UDim2.new(0, 0, 0, HEADER_H - 1),
+    BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, ZIndex = 5, Parent = canvas,
+})
+Theme.bind(headerLine, "BackgroundColor3", "accent")
+local headerLineGrad = new("UIGradient", {
+    Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 1),
+    }),
+    Offset = Vector2.new(-1, 0), Parent = headerLine,
+})
+TweenService:Create(headerLineGrad, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Offset = Vector2.new(1, 0) }):Play()
+
+do
+    local l2 = new("Frame", {
+        Name = "HeaderGlow2", Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 0, HEADER_H),
+        BackgroundColor3 = HW.PURPLE, BorderSizePixel = 0, ZIndex = 5, Parent = canvas,
+    })
+    local g2 = new("UIGradient", {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.15), NumberSequenceKeypoint.new(1, 1),
+        }),
+        Offset = Vector2.new(1, 0), Parent = l2,
+    })
+    TweenService:Create(g2, TweenInfo.new(3.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Offset = Vector2.new(-1, 0) }):Play()
+end
+
+local hContent = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ZIndex = 5, Parent = header })
+local logoImg = new("ImageLabel", {
+    Name = "HeaderLogo", AnchorPoint = Vector2.new(0, 0), BackgroundTransparency = 1, Image = LOGO_ICON,
+    ImageColor3 = WHITE, ScaleType = Enum.ScaleType.Fit, ZIndex = 6, Parent = hContent,
+})
+logoImg.Size = UDim2.new(0, LOGO_CONFIG.width, 0, LOGO_CONFIG.height)
+logoImg.Rotation = LOGO_CONFIG.rotation
+logoImg.Position = UDim2.new(0, LOGO_CONFIG.posX, 0, LOGO_CONFIG.posY)
+
+local BTN_SIZE, SEP_W = 30, 1
+local BOX_W = BTN_SIZE * 3 + SEP_W * 2 + 6
+local BOX_H = BTN_SIZE + 6
+
+local pipe = new("Frame", { Size = UDim2.new(0, 3, 0, 24), Position = UDim2.new(0, 108, 0.5, -12), BackgroundColor3 = Color3.fromRGB(84, 62, 104), BorderSizePixel = 0, ZIndex = 6, Parent = hContent })
+corner(pipe, 2)
+new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 0.8) }), Parent = pipe })
+
+local subtitleW = -(118 + BOX_W + 30)
+newLabel(hContent, SUBTITLE_TEXT, 14, FONT_STRONG, TEXT, {
+    Size = UDim2.new(1, subtitleW, 0, 18), Position = UDim2.new(0, 118, 0.5, -17), ZIndex = 6, TextTruncate = Enum.TextTruncate.AtEnd,
+})
+local premiumLbl = newLabel(hContent, PREMIUM_TEXT, 11, FONT_STRONG, WHITE, {
+    Size = UDim2.new(1, subtitleW, 0, 14), Position = UDim2.new(0, 118, 0.5, 3), ZIndex = 6, TextTruncate = Enum.TextTruncate.AtEnd,
+})
+local premiumGrad = new("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 24)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 220, 120)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 120, 24)),
+    }),
+    Offset = Vector2.new(-1, 0), Parent = premiumLbl,
+})
+
+local btnBox = new("Frame", {
+    Size = UDim2.new(0, BOX_W, 0, BOX_H), Position = UDim2.new(1, -(BOX_W + 14), 0.5, -BOX_H / 2),
+    BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 8, Parent = hContent,
+})
+corner(btnBox, 9)
+local btnBoxStroke = stroke(btnBox, Theme.c.border, 1, 0.1)
+Theme.bind(btnBox, "BackgroundColor3", "bgMain")
+Theme.bind(btnBoxStroke, "Color", "border")
+
+local function makeIconBtn(image, order, size, tint, tip, hoverColor)
+    size = size or 16
+    local b = new("TextButton", {
+        Size = UDim2.new(0, BTN_SIZE, 0, BTN_SIZE), Position = UDim2.new(0, 3 + (order - 1) * (BTN_SIZE + SEP_W), 0.5, -BTN_SIZE / 2),
+        BackgroundColor3 = hoverColor or WHITE, BackgroundTransparency = 1, Text = "", BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 9, Parent = btnBox,
+    })
+    corner(b, 7)
+    local img = new("ImageLabel", {
+        Size = UDim2.new(0, size, 0, size), Position = UDim2.new(0.5, -size / 2, 0.5, -size / 2), BackgroundTransparency = 1,
+        Image = image, ImageColor3 = tint or Color3.fromRGB(222, 215, 228), ZIndex = 10, Parent = b,
+    })
+    b.MouseEnter:Connect(function()
+        tween(b, { BackgroundTransparency = hoverColor and 0.7 or 0.88 }, 0.12)
+        tween(img, { Size = UDim2.new(0, size + 3, 0, size + 3), Position = UDim2.new(0.5, -(size + 3) / 2, 0.5, -(size + 3) / 2) }, 0.15, Enum.EasingStyle.Back)
+        if tip then Tooltip.show(tip, b) end
     end)
+    b.MouseLeave:Connect(function()
+        tween(b, { BackgroundTransparency = 1 }, 0.15)
+        tween(img, { Size = UDim2.new(0, size, 0, size), Position = UDim2.new(0.5, -size / 2, 0.5, -size / 2) }, 0.15)
+        Tooltip.hide()
+    end)
+    return b, img
+end
+
+local discordBtn, discordIcon = makeIconBtn(DISCORD_ICON, 1, 22, DISCORD_TINT, "Discord")
+local minimizeBtn = makeIconBtn(MIN_ICON, 2, 16, nil, "Minimize")
+local closeBtnHeader = makeIconBtn(CLOSE_ICON, 3, 16, nil, "Close", C_ERROR)
+
+for i = 1, 2 do
+    local sep = new("Frame", {
+        Size = UDim2.new(0, SEP_W, 0, BTN_SIZE - 8), Position = UDim2.new(0, 3 + i * BTN_SIZE + (i - 1) * SEP_W, 0.5, -(BTN_SIZE - 8) / 2),
+        BackgroundColor3 = Theme.c.border, BackgroundTransparency = 0.1, BorderSizePixel = 0, ZIndex = 9, Parent = btnBox,
+    })
+    Theme.bind(sep, "BackgroundColor3", "border")
+end
+
+local dragCatcher = new("TextButton", {
+    Size = UDim2.new(1, -(BOX_W + 28), 1, 0), Position = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1, Text = "",
+    BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 7, Parent = hContent,
+})
+
+local discordBusy = false
+discordBtn.MouseButton1Click:Connect(function()
+    if discordBusy then return end
+    discordBusy = true
+    pcall(function() setclipboard(DISCORD_URL) end)
+    Tooltip.hide()
+    local origSize, origPos = discordIcon.Size, discordIcon.Position
+    tween(discordIcon, { Rotation = 360, Size = UDim2.new(0, 28, 0, 28), Position = UDim2.new(0.5, -14, 0.5, -14) }, 0.45, Enum.EasingStyle.Back)
+    local check = new("ImageLabel", {
+        Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(0.5, -11, 0.5, -11), BackgroundTransparency = 1, Image = CHECK_ICON,
+        ImageColor3 = C_SUCCESS, ImageTransparency = 1, Rotation = -90, ScaleType = Enum.ScaleType.Fit, ZIndex = 11, Parent = discordBtn,
+    })
+    task.delay(0.25, function() if check.Parent then tween(check, { ImageTransparency = 0, Rotation = 0 }, 0.28, Enum.EasingStyle.Back) end end)
+    task.delay(1.15, function() if check.Parent then tween(check, { ImageTransparency = 1 }, 0.2) end end)
+    task.delay(1.4, function() if check.Parent then check:Destroy() end end)
+    task.delay(1.2, function() if discordIcon.Parent then tween(discordIcon, { Rotation = 0, Size = origSize, Position = origPos }, 0.2) end end)
+    notify("Discord", "Link copiado!", 1.8, "success")
+    playSound(SOUND_TAB, 0.35)
+    task.delay(1.5, function() discordBusy = false end)
+end)
+
+-- ====================================================================================================
+-- SIDEBAR
+-- ====================================================================================================
+local sidebar = new("Frame", {
+    Name = "Sidebar", Size = UDim2.new(0, SIDEBAR_W, 1, -HEADER_H), Position = UDim2.new(0, 0, 0, HEADER_H),
+    BackgroundColor3 = Theme.c.bgHeader, BorderSizePixel = 0, ZIndex = 3, Parent = canvas,
+})
+Theme.bind(sidebar, "BackgroundColor3", "bgHeader")
+new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(200, 200, 210)), Parent = sidebar })
+
+local sideDivider = new("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = Theme.c.border, BackgroundTransparency = 0.3, BorderSizePixel = 0, ZIndex = 4, Parent = sidebar })
+Theme.bind(sideDivider, "BackgroundColor3", "border")
+
+local TABS = {
+    { name = "Main",     icon = "rbxassetid://7733960981" },
+    { name = "Visuals",  icon = "rbxassetid://7743876754" },
+    { name = "Players",  icon = "rbxassetid://7743876054" },
+    { name = "Misc",     icon = "rbxassetid://7743878358" },
+    { name = "Settings", icon = "rbxassetid://7734053495" },
+}
+local TAB_H, TAB_GAP, TAB_TOP = 38, 4, 12
+local tabW = SIDEBAR_W - 18
+
+local tabIndicator = new("Frame", {
+    Name = "TabIndicator", Size = UDim2.fromOffset(tabW, TAB_H), Position = UDim2.fromOffset(8, TAB_TOP),
+    BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 1, Parent = sidebar,
+})
+corner(tabIndicator, 9)
+local indStroke = stroke(tabIndicator, Theme.c.border, 1, 0.3)
+Theme.bind(tabIndicator, "BackgroundColor3", "bgMain")
+Theme.bind(indStroke, "Color", "accent")
+local indBar = new("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(0, 3, 0.55, 0), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, ZIndex = 2, Parent = tabIndicator })
+corner(indBar, 2)
+Theme.bind(indBar, "BackgroundColor3", "accent")
+
+local profile = new("Frame", {
+    Name = "Profile", Size = UDim2.new(0, tabW, 0, 48), Position = UDim2.new(0, 8, 1, -58),
+    BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 2, Parent = sidebar,
+})
+corner(profile, 10)
+local profStroke = stroke(profile, Theme.c.border, 1, 0.25)
+Theme.bind(profile, "BackgroundColor3", "bgMain")
+Theme.bind(profStroke, "Color", "border")
+local avatar = new("ImageLabel", {
+    Size = UDim2.fromOffset(32, 32), Position = UDim2.new(0, 8, 0.5, -16), BackgroundColor3 = Theme.c.trackOff, BorderSizePixel = 0, ZIndex = 3,
+    Image = string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", LocalPlayer.UserId), Parent = profile,
+})
+corner(avatar, 16)
+local avStroke = stroke(avatar, Theme.c.accent, 1.5, 0.2)
+Theme.bind(avStroke, "Color", "accent")
+local onlineDot = new("Frame", { Size = UDim2.fromOffset(9, 9), Position = UDim2.new(0, 33, 0.5, 7), BackgroundColor3 = C_SUCCESS, BorderSizePixel = 0, ZIndex = 5, Parent = profile })
+corner(onlineDot, 5)
+local dotStroke = stroke(onlineDot, Theme.c.bgMain, 1.5, 0)
+Theme.bind(dotStroke, "Color", "bgMain")
+newLabel(profile, LocalPlayer.DisplayName ~= "" and LocalPlayer.DisplayName or LocalPlayer.Name, 12, FONT_MAIN, TEXT, {
+    Size = UDim2.new(1, -52, 0, 16), Position = UDim2.new(0, 48, 0.5, -16), TextTruncate = Enum.TextTruncate.AtEnd,
+})
+newLabel(profile, "@" .. LocalPlayer.Name, 10, FONT_MAIN, TEXT_MUTED, {
+    Size = UDim2.new(1, -52, 0, 14), Position = UDim2.new(0, 48, 0.5, 1), TextTruncate = Enum.TextTruncate.AtEnd,
+})
+
+-- ====================================================================================================
+-- AREA DE CONTEUDO + PAGINAS
+-- ====================================================================================================
+local contentGroup = new("CanvasGroup", {
+    Name = "Content", Size = UDim2.new(1, -SIDEBAR_W, 1, -HEADER_H), Position = UDim2.new(0, SIDEBAR_W, 0, HEADER_H),
+    BackgroundTransparency = 1, GroupTransparency = 0, ZIndex = 2, Parent = canvas,
+})
+
+local pages = {}
+local function makePage(tabName)
+    local page = new("ScrollingFrame", {
+        Name = tabName, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0,
+        ScrollBarThickness = 3, ScrollBarImageColor3 = Theme.c.accent, ScrollBarImageTransparency = 0.45,
+        CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y,
+        Visible = false, ZIndex = 3, Parent = contentGroup,
+    })
+    Theme.bind(page, "ScrollBarImageColor3", "accent")
+    new("UIPadding", { PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 16), PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 16), Parent = page })
+    new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = page })
+    pages[tabName] = page
+    return page
+end
+for _, tab in ipairs(TABS) do makePage(tab.name) end
+
+-- ====================================================================================================
+-- COMPONENTES
+-- ====================================================================================================
+local function cardBase(parent, height, order, clickable)
+    local wrap = new("Frame", { Name = "Wrap", Size = UDim2.new(1, 0, 0, height), BackgroundTransparency = 1, LayoutOrder = order or 0, Parent = parent })
+    wrap:SetAttribute("Entrance", true)
+    local props = {
+        Name = "Card", Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Theme.c.bgCard, BorderSizePixel = 0,
+        ClipsDescendants = true, Parent = wrap,
+    }
+    local card
+    if clickable then
+        props.AutoButtonColor = false
+        props.Text = ""
+        card = new("TextButton", props)
+    else
+        card = new("Frame", props)
+    end
+    corner(card, 10)
+    local st = stroke(card, Theme.c.border, 1, 0)
+    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(212, 212, 218)), Parent = card })
+    local bar = new("Frame", {
+        Name = "AccentBar", AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.new(0, 3, 0, 0),
+        BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, ZIndex = 4, Parent = card,
+    })
+    corner(bar, 2)
+    return wrap, card, st, bar
+end
+
+local function setScrolling(page, enabled)
+    if page and page:IsA("ScrollingFrame") then page.ScrollingEnabled = enabled end
+end
+
+local function addSectionHeader(parent, text, order)
+    local wrap = new("Frame", { Name = "Section", Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
+    local dot = new("Frame", { Size = UDim2.fromOffset(4, 12), Position = UDim2.new(0, 2, 0, 3), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, Parent = wrap })
+    corner(dot, 2)
+    Theme.bind(dot, "BackgroundColor3", "accent")
+    newLabel(wrap, string.upper(text), 11, FONT_STRONG, TEXT_DIM, { Size = UDim2.new(1, -16, 0, 18), Position = UDim2.new(0, 14, 0, 0) })
+    local line = new("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -3), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, Parent = wrap })
+    Theme.bind(line, "BackgroundColor3", "accent")
+    new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) }), Parent = line })
     return wrap
 end
 
-task.delay(1.2, function()
-    if not alive then return end
-    local data = readState()
-    if data then absorbState(data); if SpinSystem.renderAbilities then pcall(SpinSystem.renderAbilities) end end
+local function addClickButton(parent, titleText, iconId, order, callback)
+    local wrap, card, st, bar = cardBase(parent, CARD_H, order, true)
+    local hover = false
+    local title = newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -90, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
+    local icon = new("ImageLabel", {
+        Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -40, 0.5, -12), BackgroundTransparency = 1, Image = iconId,
+        ImageColor3 = TEXT, ZIndex = 3, Parent = card,
+    })
+    local function render(animate)
+        local c = Theme.c; local d = animate and 0.18 or 0
+        apply(card, { BackgroundColor3 = hover and c.hover or c.bgCard }, d)
+        apply(st, { Color = hover and c.accent or c.border }, d)
+        apply(title, { TextColor3 = hover and c.accent or TEXT }, d)
+        apply(icon, { ImageColor3 = hover and c.accent or TEXT }, d)
+        apply(bar, { Size = UDim2.new(0, 3, hover and 0.5 or 0, 0) }, d, Enum.EasingStyle.Back)
+    end
+    Theme.reg(card, function(_, a) render(a) end)
+    card.MouseEnter:Connect(function() hover = true render(true) end)
+    card.MouseLeave:Connect(function() hover = false render(true) end)
+    card.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            ripple(card, input)
+        end
+    end)
+    card.MouseButton1Click:Connect(function()
+        playSound(SOUND_TAB, 0.35)
+        icon.Rotation = 0
+        tween(icon, { Size = UDim2.new(0, 30, 0, 30), Position = UDim2.new(1, -43, 0.5, -15), Rotation = 12 }, 0.1)
+        task.delay(0.1, function()
+            if icon.Parent then tween(icon, { Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -40, 0.5, -12), Rotation = 0 }, 0.3, Enum.EasingStyle.Back) end
+        end)
+        if callback then callback(card) end
+    end)
+    return card
+end
+
+local function addToggle(parent, key, titleText, order, callback)
+    local state = Options[key] == true
+    local wrap, card, st, bar = cardBase(parent, CARD_H, order, true)
+    local hover = false
+    local title = newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -90, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
+
+    local track = new("Frame", { Size = UDim2.fromOffset(44, 22), Position = UDim2.new(1, -58, 0.5, -11), BackgroundColor3 = Theme.c.trackOff, BorderSizePixel = 0, ZIndex = 3, Parent = card })
+    corner(track, 11)
+    new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(205, 205, 214)), Parent = track })
+    local tStroke = stroke(track, Theme.c.border, 1, 0)
+    local knob = new("Frame", { Size = UDim2.fromOffset(16, 16), Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 4, Parent = track })
+    corner(knob, 8)
+
+    local function render(animate)
+        local c = Theme.c
+        local d = animate and 0.22 or 0
+        apply(card, { BackgroundColor3 = hover and c.hover or c.bgCard }, d)
+        apply(st, { Color = state and c.border:Lerp(c.accent, 0.45) or (hover and c.border:Lerp(c.accent, 0.3) or c.border) }, d)
+        apply(title, { TextColor3 = state and c.accent or TEXT }, d)
+        apply(track, { BackgroundColor3 = state and c.accent or c.trackOff }, d)
+        apply(tStroke, { Color = state and c.glow or c.border }, d)
+        apply(knob, {
+            Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8),
+            BackgroundColor3 = state and WHITE or Color3.fromRGB(190, 178, 200),
+        }, d, Enum.EasingStyle.Back)
+        apply(bar, { Size = UDim2.new(0, 3, state and 0.55 or 0, 0) }, d, Enum.EasingStyle.Back)
+    end
+    Theme.reg(card, function(_, a) render(a) end)
+
+    Registry[key] = function(v)
+        state = v == true
+        setOption(key, state)
+        render(true)
+        if callback then pcall(callback, state) end
+    end
+
+    card.MouseEnter:Connect(function() hover = true render(true) end)
+    card.MouseLeave:Connect(function() hover = false render(true) end)
+    card.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            ripple(card, input)
+        end
+    end)
+    card.MouseButton1Click:Connect(function()
+        state = not state
+        setOption(key, state)
+        playSound(SOUND_TAB, 0.3)
+        tween(knob, { Size = UDim2.fromOffset(22, 16) }, 0.1)
+        task.delay(0.1, function() if knob.Parent then tween(knob, { Size = UDim2.fromOffset(16, 16) }, 0.2, Enum.EasingStyle.Back) end end)
+        render(true)
+        if callback then callback(state) end
+    end)
+end
+
+local function addSlider(parent, key, titleText, minV, maxV, order, callback)
+    minV = minV or 0
+    maxV = maxV or 100
+    local value = math.clamp(math.floor((tonumber(Options[key]) or minV) + 0.5), minV, maxV)
+    local wrap, card, st, bar = cardBase(parent, 58, order, false)
+    local hover, dragging, focused = false, false, false
+
+    local title = newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -110, 0, 20), Position = UDim2.new(0, 16, 0, 8) })
+    local numBox = new("TextBox", {
+        Size = UDim2.fromOffset(62, 24), Position = UDim2.new(1, -78, 0, 6), BackgroundColor3 = Theme.c.bgMain, Text = tostring(value),
+        TextColor3 = Theme.c.accent, TextSize = 12, Font = FONT_STRONG, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Center,
+        ClearTextOnFocus = false, ZIndex = 3, Parent = card,
+    })
+    corner(numBox, 7)
+    local nbStroke = stroke(numBox, Theme.c.border, 1, 0)
+    local hit = new("TextButton", { Size = UDim2.new(1, -32, 0, 24), Position = UDim2.new(0, 16, 1, -30), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 4, Parent = card })
+    local track = new("Frame", { Size = UDim2.new(1, 0, 0, 6), Position = UDim2.new(0, 0, 0.5, -3), BackgroundColor3 = Theme.c.trackOff, BorderSizePixel = 0, ZIndex = 4, Parent = hit })
+    corner(track, 3)
+    local ratio0 = (value - minV) / (maxV - minV)
+    local fill = new("Frame", { Size = UDim2.new(ratio0, 0, 1, 0), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 5, Parent = track })
+    corner(fill, 3)
+    local fillGrad = new("UIGradient", { Color = ColorSequence.new(Theme.c.accent, Theme.c.glow), Parent = fill })
+    local knob = new("Frame", {
+        Size = UDim2.fromOffset(14, 14), Position = UDim2.new(ratio0, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 6, Parent = track,
+    })
+    corner(knob, 7)
+    local kStroke = stroke(knob, Theme.c.accent, 2, 0)
+
+    local function render(animate)
+        local c = Theme.c
+        local d = animate and 0.18 or 0
+        apply(card, { BackgroundColor3 = (hover or dragging) and c.hover or c.bgCard }, d)
+        apply(st, { Color = (hover or dragging) and c.border:Lerp(c.accent, 0.4) or c.border }, d)
+        apply(track, { BackgroundColor3 = c.trackOff }, d)
+        apply(numBox, { BackgroundColor3 = c.bgMain, TextColor3 = c.accent }, d)
+        apply(nbStroke, { Color = focused and c.accent or c.border }, d)
+        apply(kStroke, { Color = c.accent }, d)
+        apply(bar, { Size = UDim2.new(0, 3, dragging and 0.55 or 0, 0) }, d, Enum.EasingStyle.Back)
+        apply(knob, { Size = dragging and UDim2.fromOffset(18, 18) or UDim2.fromOffset(14, 14) }, d, Enum.EasingStyle.Back)
+        fillGrad.Color = ColorSequence.new(c.accent, c.glow)
+    end
+    Theme.reg(card, function(_, a) render(a) end)
+
+    local function setValue(v, fromBox, silent)
+        v = math.clamp(math.floor(v + 0.5), minV, maxV)
+        local changed = v ~= value
+        value = v
+        setOption(key, value)
+        local r = (value - minV) / (maxV - minV)
+        local d = silent and 0 or 0.08
+        apply(fill, { Size = UDim2.new(r, 0, 1, 0) }, d)
+        apply(knob, { Position = UDim2.new(r, 0, 0.5, 0) }, d)
+        if not fromBox then numBox.Text = tostring(value) end
+        if not silent and changed and callback then callback(value) end
+    end
+
+    Registry[key] = function(v) setValue(tonumber(v) or minV, false, true) end
+    local function fromX(x)
+        local pos = math.clamp((x - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
+        setValue(minV + (maxV - minV) * pos, false)
+    end
+    hit.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; setScrolling(parent, false); render(true); fromX(input.Position.X)
+        end
+    end)
+    bind(UserInputService.InputChanged, function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            fromX(input.Position.X)
+        end
+    end)
+    bind(UserInputService.InputEnded, function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragging = false; setScrolling(parent, true); render(true)
+        end
+    end)
+    numBox.Focused:Connect(function() focused = true render(true) end)
+    numBox.FocusLost:Connect(function()
+        focused = false; render(true)
+        local n = tonumber(numBox.Text)
+        if not n then numBox.Text = tostring(value) return end
+        setValue(n, false)
+    end)
+    card.MouseEnter:Connect(function() hover = true render(true) end)
+    card.MouseLeave:Connect(function() hover = false render(true) end)
+end
+
+local function addTextBox(parent, key, titleText, order, callback, placeholder)
+    local initText = key and tostring(Options[key] or "") or ""
+    local wrap, card, st, bar = cardBase(parent, CARD_H, order, false)
+    local hover, focused = false, false
+    newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -170, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
+    local box = new("TextBox", {
+        Size = UDim2.fromOffset(142, 26), Position = UDim2.new(1, -156, 0.5, -13), BackgroundColor3 = Theme.c.bgMain, Text = initText,
+        PlaceholderText = placeholder or "Type...", PlaceholderColor3 = Color3.fromRGB(112, 92, 132), TextColor3 = Theme.c.accent,
+        TextSize = 11, Font = FONT_STRONG, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false,
+        TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 3, Parent = card,
+    })
+    corner(box, 7)
+    new("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 9), Parent = box })
+    local bStroke = stroke(box, Theme.c.border, 1, 0)
+    local function render(animate)
+        local c = Theme.c; local d = animate and 0.18 or 0
+        apply(card, { BackgroundColor3 = (hover or focused) and c.hover or c.bgCard }, d)
+        apply(st, { Color = focused and c.accent or (hover and c.border:Lerp(c.accent, 0.3) or c.border) }, d)
+        apply(box, { BackgroundColor3 = c.bgMain, TextColor3 = c.accent }, d)
+        apply(bStroke, { Color = focused and c.accent or c.border }, d)
+    end
+    Theme.reg(card, function(_, a) render(a) end)
+    if key then Registry[key] = function(v) local s = tostring(v or ""); setOption(key, s); box.Text = s end end
+    box.Focused:Connect(function() focused = true render(true) end)
+    box.FocusLost:Connect(function()
+        focused = false; render(true)
+        if key then setOption(key, box.Text) end
+        if callback then callback(box.Text) end
+    end)
+    card.MouseEnter:Connect(function() hover = true render(true) end)
+    card.MouseLeave:Connect(function() hover = false render(true) end)
+    return box
+end
+
+local function addDropdown(parent, titleText, order, spec)
+    local wrap, card, st, bar = cardBase(parent, CARD_H + 4, order, true)
+    local hover = false
+    newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -170, 1, 0), Position = UDim2.new(0, 16, 0, 0) })
+    local box = new("Frame", { Size = UDim2.fromOffset(138, 28), Position = UDim2.new(1, -152, 0.5, -14), BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 3, Parent = card })
+    corner(box, 8)
+    local boxStroke = stroke(box, Theme.c.border, 1, 0.1)
+    local display = newLabel(box, "None", 11, FONT_MAIN, TEXT_MUTED, { Size = UDim2.new(1, -30, 1, 0), Position = UDim2.new(0, 10, 0, 0), TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 4 })
+    local arrow = new("ImageLabel", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(14, 14), Position = UDim2.new(1, -14, 0.5, 0), BackgroundTransparency = 1,
+        Image = ARROW_ICON, ImageColor3 = TEXT_MUTED, ScaleType = Enum.ScaleType.Fit, ZIndex = 4, Parent = box,
+    })
+    local obj = {}
+    local function render(animate)
+        local c = Theme.c
+        local d = animate and 0.18 or 0
+        local v = spec.get()
+        local isNone = (v == nil or v == "" or v == "None")
+        local open = Popup.current and Popup.current.anchor == box
+        display.Text = isNone and "None" or v
+        apply(card, { BackgroundColor3 = hover and c.hover or c.bgCard }, d)
+        apply(st, { Color = (hover or open) and c.accent or c.border }, d)
+        apply(display, { TextColor3 = isNone and TEXT_MUTED or c.accent }, d)
+        apply(arrow, { ImageColor3 = (hover or open) and c.accent or TEXT_MUTED }, d)
+        apply(box, { BackgroundColor3 = c.bgMain }, d)
+        apply(boxStroke, { Color = open and c.accent or c.border }, d)
+    end
+    obj.refresh = function() render(true) end
+    Theme.reg(card, function(_, a) render(a) end)
+    card.MouseEnter:Connect(function() hover = true render(true) end)
+    card.MouseLeave:Connect(function() hover = false render(true) end)
+    card.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            ripple(card, input)
+        end
+    end)
+    card.MouseButton1Click:Connect(function()
+        Popup.open(box, {
+            header = spec.header, options = spec.getOptions(), selected = spec.get(), empty = spec.empty, arrow = arrow,
+            onPick = function(name) spec.set(name); render(true) end,
+        })
+    end)
+    return obj
+end
+
+local function addColorPicker(parent, key, titleText, order)
+    local EXPANDED_H = CARD_H + 168
+    local wrap, card, st, bar = cardBase(parent, CARD_H, order, false)
+    local hover = false
+    newLabel(card, titleText, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1, -150, 0, CARD_H), Position = UDim2.new(0, 16, 0, 0) })
+    local hexLbl = newLabel(card, toHex(Options[key]), 11, FONT_CODE, TEXT_MUTED, {
+        Size = UDim2.fromOffset(70, CARD_H), Position = UDim2.new(1, -128, 0, 0), TextXAlignment = Enum.TextXAlignment.Right,
+    })
+    local colorSq = new("TextButton", {
+        Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -46, 0, 6), BackgroundColor3 = Options[key], Text = "",
+        AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 6, Parent = card,
+    })
+    corner(colorSq, 8)
+    local sqStroke = stroke(colorSq, Theme.c.border, 1.5, 0)
+    local rowHit = new("TextButton", { Size = UDim2.new(1, 0, 0, CARD_H), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 4, Parent = card })
+    local content = new("Frame", { Size = UDim2.new(1, 0, 0, EXPANDED_H - CARD_H), Position = UDim2.new(0, 0, 0, CARD_H), BackgroundTransparency = 1, ZIndex = 3, Parent = card })
+    new("Frame", { Size = UDim2.new(1, -28, 0, 1), Position = UDim2.new(0, 14, 0, 0), BackgroundColor3 = Theme.c.border, BackgroundTransparency = 0.3, BorderSizePixel = 0, Parent = content })
+    local preview = new("Frame", { Size = UDim2.fromOffset(64, 64), Position = UDim2.new(0, 16, 0, 14), BackgroundColor3 = Options[key], BorderSizePixel = 0, ZIndex = 3, Parent = content })
+    corner(preview, 10)
+    stroke(preview, Theme.c.border, 1.5, 0)
+    local previewHex = newLabel(content, toHex(Options[key]), 12, FONT_CODE, TEXT, { Size = UDim2.fromOffset(100, 18), Position = UDim2.new(0, 16, 0, 84) })
+    local SV = 118
+    local sv = new("Frame", { Size = UDim2.fromOffset(SV, SV), Position = UDim2.new(1, -(SV + 16), 0, 14), BackgroundColor3 = Color3.fromRGB(255, 0, 0), BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 3, Parent = content })
+    corner(sv, 8)
+    stroke(sv, Theme.c.border, 1, 0.2)
+    local whiteLayer = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 4, Parent = sv })
+    corner(whiteLayer, 8)
+    new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) }), Parent = whiteLayer })
+    local blackLayer = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = BLACK, BorderSizePixel = 0, ZIndex = 5, Parent = sv })
+    corner(blackLayer, 8)
+    new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }), Parent = blackLayer })
+    local svHit = new("TextButton", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 7, Parent = sv })
+    local svCursor = new("Frame", { Size = UDim2.fromOffset(16, 16), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 8, Parent = sv })
+    corner(svCursor, 8)
+    stroke(svCursor, WHITE, 2, 0)
+    local svDot = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.fromOffset(4, 4), BackgroundColor3 = BLACK, BorderSizePixel = 0, ZIndex = 8, Parent = svCursor })
+    corner(svDot, 2)
+    local hueWrap = new("Frame", { Size = UDim2.new(1, -32, 0, 18), Position = UDim2.new(0, 16, 0, 14 + SV + 12), BackgroundTransparency = 1, ZIndex = 3, Parent = content })
+    local hueTrack = new("Frame", { Size = UDim2.new(1, 0, 0, 12), Position = UDim2.new(0, 0, 0.5, -6), BackgroundColor3 = WHITE, BorderSizePixel = 0, ZIndex = 3, Parent = hueWrap })
+    corner(hueTrack, 6)
+    new("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+            ColorSequenceKeypoint.new(1 / 6, Color3.fromRGB(255, 255, 0)),
+            ColorSequenceKeypoint.new(2 / 6, Color3.fromRGB(0, 255, 0)),
+            ColorSequenceKeypoint.new(3 / 6, Color3.fromRGB(0, 255, 255)),
+            ColorSequenceKeypoint.new(4 / 6, Color3.fromRGB(0, 0, 255)),
+            ColorSequenceKeypoint.new(5 / 6, Color3.fromRGB(255, 0, 255)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+        }),
+        Parent = hueTrack,
+    })
+    local hueHit = new("TextButton", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 5, Parent = hueWrap })
+    local hueCursor = new("Frame", { Size = UDim2.fromOffset(16, 20), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(255, 0, 0), BorderSizePixel = 0, ZIndex = 6, Parent = hueWrap })
+    corner(hueCursor, 6)
+    stroke(hueCursor, WHITE, 2.5, 0)
+    local h0, s0, v0 = rgbToHsv(Options[key])
+    local picker = { hue = h0, sat = s0, val = v0, svDrag = false, hueDrag = false, open = false }
+    local function placeSV() svCursor.Position = UDim2.new(picker.sat, 0, 1 - picker.val, 0) end
+    local function placeHue() hueCursor.Position = UDim2.new(picker.hue / 360, 0, 0.5, 0); hueCursor.BackgroundColor3 = hsvToRgb(picker.hue, 1, 1) end
+    local function commit(silent)
+        local c = hsvToRgb(picker.hue, picker.sat, picker.val)
+        genv.BabisESPColor = c
+        setOption(key, c)
+        preview.BackgroundColor3 = c
+        colorSq.BackgroundColor3 = c
+        local hx = toHex(c)
+        hexLbl.Text = hx
+        previewHex.Text = hx
+    end
+    placeSV() placeHue()
+    sv.BackgroundColor3 = hsvToRgb(picker.hue, 1, 1)
+    Registry[key] = function(newColor)
+        if typeof(newColor) ~= "Color3" then return end
+        local h, s, v = rgbToHsv(newColor)
+        picker.hue, picker.sat, picker.val = h, s, v
+        placeSV() placeHue()
+        sv.BackgroundColor3 = hsvToRgb(h, 1, 1)
+        commit(true)
+    end
+    local function updateSV(mx, my)
+        local ap, as = sv.AbsolutePosition, sv.AbsoluteSize
+        if as.X <= 0 or as.Y <= 0 then return end
+        picker.sat = math.clamp((mx - ap.X) / as.X, 0, 1)
+        picker.val = 1 - math.clamp((my - ap.Y) / as.Y, 0, 1)
+        placeSV() commit()
+    end
+    local function updateHue(mx)
+        local ap, as = hueWrap.AbsolutePosition, hueWrap.AbsoluteSize
+        if as.X <= 0 then return end
+        picker.hue = math.clamp((mx - ap.X) / as.X, 0, 1) * 359.99
+        placeHue()
+        sv.BackgroundColor3 = hsvToRgb(picker.hue, 1, 1)
+        commit()
+    end
+    svHit.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            picker.svDrag = true; setScrolling(parent, false); updateSV(input.Position.X, input.Position.Y)
+        end
+    end)
+    hueHit.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            picker.hueDrag = true; setScrolling(parent, false); updateHue(input.Position.X)
+        end
+    end)
+    bind(UserInputService.InputChanged, function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        if picker.svDrag then updateSV(input.Position.X, input.Position.Y)
+        elseif picker.hueDrag then updateHue(input.Position.X) end
+    end)
+    bind(UserInputService.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if picker.svDrag or picker.hueDrag then setScrolling(parent, true) end
+            picker.svDrag, picker.hueDrag = false, false
+        end
+    end)
+    local function render(animate)
+        local c = Theme.c; local d = animate and 0.2 or 0
+        apply(card, { BackgroundColor3 = (hover or picker.open) and c.hover or c.bgCard }, d)
+        apply(st, { Color = picker.open and c.accent or (hover and c.border:Lerp(c.accent, 0.3) or c.border) }, d)
+        apply(sqStroke, { Color = picker.open and c.accent or c.border }, d)
+    end
+    Theme.reg(card, function(_, a) render(a) end)
+    local function setOpen(open)
+        picker.open = open
+        playSound(SOUND_TAB, 0.3)
+        tween(wrap, { Size = UDim2.new(1, 0, 0, open and EXPANDED_H or CARD_H) }, 0.34, Enum.EasingStyle.Quint)
+        render(true)
+    end
+    colorSq.Activated:Connect(function() setOpen(not picker.open) end)
+    rowHit.Activated:Connect(function() setOpen(not picker.open) end)
+    rowHit.MouseEnter:Connect(function() hover = true render(true) end)
+    rowHit.MouseLeave:Connect(function() hover = false render(true) end)
+end
+
+local function flashButton(btn, col)
+    local ov = new("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = col, BackgroundTransparency = 0.15, BorderSizePixel = 0, ZIndex = 20, Parent = btn })
+    corner(ov, 9)
+    tween(ov, { BackgroundTransparency = 1 }, 0.6, Enum.EasingStyle.Quad)
+    Debris:AddItem(ov, 0.65)
+end
+
+local function addButtonRow(parent, order, defs)
+    local wrap = new("Frame", { Name = "Wrap", Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1, LayoutOrder = order, Parent = parent })
+    wrap:SetAttribute("Entrance", true)
+    local row = new("Frame", { Name = "Card", Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Parent = wrap })
+    new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = row })
+    local n = #defs
+    local buttons = {}
+    for i, def in ipairs(defs) do
+        local btn = new("TextButton", {
+            Size = UDim2.new(1 / n, -(8 * (n - 1) / n), 1, 0), BackgroundColor3 = Theme.c.bgCard, Text = def.text, TextColor3 = TEXT,
+            Font = FONT_MAIN, TextSize = 12, BorderSizePixel = 0, AutoButtonColor = false, ClipsDescendants = true, LayoutOrder = i, Parent = row,
+        })
+        corner(btn, 9)
+        local bs = stroke(btn, Theme.c.border, 1, 0.2)
+        new("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(212, 212, 218)), Parent = btn })
+        local hover = false
+        local function render(animate)
+            local c = Theme.c; local d = animate and 0.15 or 0
+            local hc = def.hoverColor or c.accent
+            apply(btn, { BackgroundColor3 = hover and c.hover or c.bgCard, TextColor3 = hover and hc or TEXT }, d)
+            apply(bs, { Color = hover and hc or c.border, Transparency = hover and 0 or 0.2 }, d)
+        end
+        Theme.reg(btn, function(_, a) render(a) end)
+        btn.MouseEnter:Connect(function() hover = true render(true) end)
+        btn.MouseLeave:Connect(function() hover = false render(true) end)
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                ripple(btn, input)
+            end
+        end)
+        btn.MouseButton1Click:Connect(function()
+            playSound(SOUND_TAB, 0.35)
+            if def.callback then def.callback(btn) end
+        end)
+        buttons[i] = btn
+    end
+    return buttons
+end
+
+-- ====================================================================================================
+-- MAIN TAB — Hulk options
+-- ====================================================================================================
+local mainPage = pages["Main"]
+
+addSectionHeader(mainPage, "COMBAT", 0)
+addToggle(mainPage, "auto_kill_hulk", "Auto Kill Hulk", 10, function(v) AutoKill.setEnabled(v) end)
+addClickButton(mainPage, "Kill Hulk Button", CLICK_ICON, 11, function()
+    local ok = Fling.fire()
+    notify("Kill Hulk", ok and "Fling started" or "No Hulk / abort", 2, ok and "success" or "warn")
+end)
+addSlider(mainPage, "fling_predict", "Kill Predict", -100, 100, 12, function(v) Fling.predictOffset = v end)
+if Options["fling_predict"] == nil then Options["fling_predict"] = 1 end
+Fling.predictOffset = Options["fling_predict"] or 1
+addSlider(mainPage, "fling_speed", "Speed Kill", 100, 1200, 13, function(v)
+    Fling.linearForce = v
+    Fling.spinForce = v * FLING_SPIN_MULT
+    AutoKill.burstForce = v
+    AutoKill.burstSpin = v * FLING_SPIN_MULT
+end)
+if Options["fling_speed"] == nil then Options["fling_speed"] = DEFAULT_FLING_SPEED end
+Fling.linearForce = Options["fling_speed"] or DEFAULT_FLING_SPEED
+Fling.spinForce = Fling.linearForce * FLING_SPIN_MULT
+AutoKill.burstForce = Fling.linearForce
+AutoKill.burstSpin = Fling.spinForce
+
+addSectionHeader(mainPage, "ESCAPE", 20)
+addToggle(mainPage, "auto_panic", "Auto Escape", 21, function(v) Panic.setAuto(v) end)
+addClickButton(mainPage, "Escape Button", CLICK_ICON, 22, function()
+    local ok = Panic.fireManual()
+    notify("Escape", ok and "Teleported" or "No safe spot / cooldown", 2, ok and "success" or "warn")
 end)
 
-return {
-    AutoKill = AutoKill,
-    Fling = Fling,
-    PlayerESP = PlayerESP,
-    ChanceESP = ChanceESP,
-    EspVents = EspVents,
-    EspCabinet = EspCabinet,
-    AntiDebris = AntiDebris,
-    EventLog = EventLog,
-    HulkAlert = HulkAlert,
-    Panic = Panic,
-    InfiniteStamina = InfiniteStamina,
-    AntiRagdoll = AntiRagdoll,
-    PlayerState = PlayerState,
-    applyPlayerState = applyPlayerState,
-    AutoPunch = AutoPunch,
-    AutoMission = AutoMission,
-    SpinSystem = SpinSystem,
-    Doors = Doors,
-    addAbilityList = addAbilityList,
-}
-end)()
--- ===== END GAME LOGIC CLOSURE =====
+addSectionHeader(mainPage, "REWARDS", 30)
+addToggle(mainPage, "auto_collect_rewards", "Auto Collect Rewards", 31, function(v)
+    if v then Rewards.enable() else Rewards.disable() end
+end)
 
--- ===== SETTINGS PAGE — all Hulk options in one place =====
-do
-    local settingsPage = pages["Settings"]
-    local current_config = tostring(Options.last_selected_config or "")
-    local cfgDropdown
-    local function refreshConfigs() return ConfigSys.list() end
-    local function persistAutoload()
-        if Options.auto_load_config and current_config ~= "" then
-            ConfigSys.writeAutoload(true, current_config)
+-- ====================================================================================================
+-- VISUALS TAB — Hulk options
+-- ====================================================================================================
+local visualPage = pages["Visuals"]
+
+addSectionHeader(visualPage, "PLAYER ESP", 0)
+addToggle(visualPage, "esp_hulk", "ESP Hulk", 1, function(v) PlayerESP.setFlag("hulk", v) end)
+addToggle(visualPage, "esp_hulkbuster", "ESP Hulkbuster", 2, function(v) PlayerESP.setFlag("hulkbuster", v) end)
+addToggle(visualPage, "esp_survivor", "ESP Survivor", 3, function(v) PlayerESP.setFlag("survivor", v) end)
+addToggle(visualPage, "esp_weapons", "ESP Weapons", 4, function(v) PlayerESP.setFlag("weapon", v) end)
+addToggle(visualPage, "esp_ability", "ESP Ability Owners", 5, function(v) PlayerESP.setFlag("abilityHighlight", v) end)
+
+addSectionHeader(visualPage, "WORLD ESP", 10)
+addToggle(visualPage, "esp_vents", "ESP Vents", 11, function(v)
+    if v then EspVents.enable() else EspVents.disable() end
+end)
+addToggle(visualPage, "esp_cabinet", "ESP Cabinet", 12, function(v)
+    if v then EspCabinet.enable() else EspCabinet.disable() end
+end)
+
+addSectionHeader(visualPage, "INTEL", 20)
+addToggle(visualPage, "esp_hulk_chance", "ESP Hulk Probability + Pity", 21, function(v)
+    if v then ChanceESP.enable() else ChanceESP.disable() end
+end)
+
+-- ====================================================================================================
+-- PLAYERS TAB — Hulk options
+-- ====================================================================================================
+local playersPage = pages["Players"]
+
+addSectionHeader(playersPage, "SURVIVOR", 0)
+addToggle(playersPage, "inf_stamina", "Infinite Stamina (Survivor)", 1, function(v)
+    if v then InfiniteStamina.enable() else InfiniteStamina.disable() end
+end)
+addToggle(playersPage, "anti_ragdoll", "Anti Ragdoll", 2, function(v)
+    if v then AntiRagdoll.enable() else AntiRagdoll.disable() end
+end)
+
+addSectionHeader(playersPage, "JUMP", 10)
+addToggle(playersPage, "jump_enabled", "JumpPower", 11, function(v)
+    PlayerState.jumpEnabled = v; applyPlayerState()
+end)
+addSlider(playersPage, "jump_value", "JumpPower Value", 50, 500, 12, function(v)
+    PlayerState.jumpPower = v
+    if PlayerState.jumpEnabled then applyPlayerState() end
+end)
+if Options["jump_value"] == nil then Options["jump_value"] = 50 end
+PlayerState.jumpPower = Options["jump_value"] or 50
+PlayerState.jumpEnabled = Options["jump_enabled"] == true
+
+addSectionHeader(playersPage, "SPEED", 20)
+addToggle(playersPage, "tpwalk_enabled", "Speed Power", 21, function(v) PlayerState.speedPower = v end)
+addSlider(playersPage, "tp_speed", "Speed Power Value", 1, 50, 22, function(v) PlayerState.tpSpeed = v end)
+if Options["tp_speed"] == nil then Options["tp_speed"] = 3 end
+PlayerState.tpSpeed = Options["tp_speed"] or 3
+PlayerState.speedPower = Options["tpwalk_enabled"] == true
+
+-- ====================================================================================================
+-- MISC TAB — Hulk options
+-- ====================================================================================================
+local miscPage = pages["Misc"]
+
+addSectionHeader(miscPage, "UTILITY", 0)
+addToggle(miscPage, "anti_debris", "Anti Debris", 1, function(v)
+    if v then AntiDebris.enable() else AntiDebris.disable() end
+end)
+addToggle(miscPage, "remove_doors", "Remove Doors", 2, function(v)
+    if v then Doors.enable() else Doors.disable() end
+end)
+
+addSectionHeader(miscPage, "INTEL", 10)
+addToggle(miscPage, "live_event", "Live Event", 11, function(v)
+    if v then EventLog.enable() else EventLog.disable() end
+end)
+addToggle(miscPage, "hulk_alert", "Hulk Alert", 12, function(v)
+    if v then HulkAlert.enable() else HulkAlert.disable() end
+end)
+
+-- ====================================================================================================
+-- SETTINGS TAB — Configs + Aparência (mantido)
+-- ====================================================================================================
+local settingsPage = pages["Settings"]
+local current_config = tostring(Options.last_selected_config or "")
+local cfgDropdown
+
+local function refreshConfigs() return ConfigSys.list() end
+
+local function persistAutoload()
+    if Options.auto_load_config and current_config ~= "" then
+        ConfigSys.writeAutoload(true, current_config)
+    else
+        ConfigSys.writeAutoload(false, current_config)
+    end
+end
+
+local function selectConfig(name)
+    current_config = name or ""
+    setOption("last_selected_config", current_config)
+    if cfgDropdown then cfgDropdown.refresh() end
+    if Options.auto_load_config then persistAutoload() end
+end
+
+local function applyToUI(applied)
+    local delay = 0
+    for k, _ in pairs(applied) do
+        if k == "theme_color" then
+            if Registry[k] then pcall(Registry[k], Options[k]) end
         else
-            ConfigSys.writeAutoload(false, current_config)
-        end
-    end
-    local function selectConfig(name)
-        current_config = name or ""
-        setOption("last_selected_config", current_config)
-        if cfgDropdown then cfgDropdown.refresh() end
-        if Options.auto_load_config then persistAutoload() end
-    end
-    local APPLY_ORDER = { "theme_color", "auto_load_config" }
-    local function applyToUI(applied, cascade)
-        local delay = 0
-        for _, key in ipairs(APPLY_ORDER) do
-            if applied[key] then
-                local setter = Registry[key]
-                local value = Options[key]
-                if setter and value ~= nil then
-                    if cascade then task.delay(delay, function() if alive then pcall(setter, value) end end); delay = delay + 0.08
-                    else pcall(setter, value) end
-                end
-            end
-        end
-        for k, _ in pairs(applied) do
-            if not k:match("^theme_color$") and not k:match("^auto_load_config$") then
-                local setter = Registry[k]
-                if setter and Options[k] ~= nil then
-                    if cascade then task.delay(delay, function() if alive then pcall(setter, Options[k]) end end); delay = delay + 0.05
-                    else pcall(setter, Options[k]) end
-                end
+            local setter = Registry[k]
+            if setter and Options[k] ~= nil then
+                task.delay(delay, function() if alive then pcall(setter, Options[k]) end end)
+                delay = delay + 0.05
             end
         end
     end
-    Registry["theme_color"] = function(c) Theme.set(c) end
+    playSound(SOUND_NOTIF, 0.4)
+end
 
-    -- CONFIGURATION
-    addSectionHeader(settingsPage, "CONFIGURATION", 0)
-    local nameBox = addTextBox(settingsPage, nil, "Config Name", 10, nil, "Enter preset name...")
-    cfgDropdown = addDropdown(settingsPage, "Selected Config", 11, {
-        header = "Configs",
-        getOptions = refreshConfigs,
-        get = function() return current_config end,
-        set = function(name) selectConfig(name) end,
-        empty = "No configs found",
-    })
-    addButtonRow(settingsPage, 12, {
+Registry["theme_color"] = function(c) Theme.set(c) end
+
+addSectionHeader(settingsPage, "CONFIGURATION", 0)
+
+local nameBox = addTextBox(settingsPage, nil, "Config Name", 10, nil, "Enter preset name...")
+
+cfgDropdown = addDropdown(settingsPage, "Selected Config", 11, {
+    header = "Configs",
+    getOptions = refreshConfigs,
+    get = function() return current_config end,
+    set = function(name) selectConfig(name) end,
+    empty = "No configs found",
+})
+
+do
+    local createBtn, saveBtn, loadBtn, delBtn, refBtn
+
+    local row1 = addButtonRow(settingsPage, 12, {
         { text = "Create Config", callback = function()
             local name = ConfigSys.sanitize(nameBox.Text)
-            if name == "" then notify("Config", "Enter a name first", 2, "error"); return end
-            if not ConfigSys.canWrite() then notify("Config", "Executor has no file access", 2.5, "error"); return end
-            if ConfigSys.exists(name) then notify("Config", "Already exists: " .. name, 2.5, "warn"); return end
-            if ConfigSys.save(name, serializeOptions()) then
+            if name == "" then notify("Config", "Enter a name first", 2, "error"); flashButton(createBtn, C_ERROR)
+            elseif not ConfigSys.canWrite() then notify("Config", "Executor has no file access", 2.5, "error"); flashButton(createBtn, C_ERROR)
+            elseif ConfigSys.exists(name) then notify("Config", "Already exists: " .. name, 2.5, "warn"); flashButton(createBtn, C_WARN)
+            elseif ConfigSys.save(name, serializeOptions()) then
                 nameBox.Text = ""
                 notify("Config", "Created: " .. name, 2, "success")
                 selectConfig(name)
-            else notify("Config", "Failed to create", 2, "error") end
+                flashButton(createBtn, C_SUCCESS)
+            else notify("Config", "Failed to create", 2, "error"); flashButton(createBtn, C_ERROR) end
         end },
         { text = "Save Config", callback = function()
             if current_config ~= "" then
                 if ConfigSys.save(current_config, serializeOptions()) then
                     notify("Config", "Saved: " .. current_config, 2, "success")
-                else notify("Config", "Failed to save", 2, "error") end
-            else notify("Config", "No config selected", 2, "error") end
+                    flashButton(saveBtn, C_SUCCESS)
+                else notify("Config", "Failed to save", 2, "error"); flashButton(saveBtn, C_ERROR) end
+            else notify("Config", "No config selected", 2, "error"); flashButton(saveBtn, C_ERROR) end
         end },
     })
-    addButtonRow(settingsPage, 13, {
+    createBtn, saveBtn = row1[1], row1[2]
+
+    local row2 = addButtonRow(settingsPage, 13, {
         { text = "Load Config", callback = function()
             if current_config ~= "" then
                 local data = ConfigSys.load(current_config)
                 if data then
                     local applied = deserializeOptions(data)
-                    applyToUI(applied, true)
+                    applyToUI(applied)
                     notify("Config", "Loaded: " .. current_config, 2, "success")
-                else notify("Config", "Failed to load", 2, "error") end
-            else notify("Config", "No config selected", 2, "error") end
+                    flashButton(loadBtn, Theme.c.accent)
+                else notify("Config", "Failed to load", 2, "error"); flashButton(loadBtn, C_ERROR) end
+            else notify("Config", "No config selected", 2, "error"); flashButton(loadBtn, C_ERROR) end
         end },
         { text = "Delete Config", hoverColor = C_ERROR, callback = function()
-            if current_config == "" then notify("Config", "No config selected", 2, "error"); return end
+            if current_config == "" then notify("Config", "No config selected", 2, "error"); flashButton(delBtn, C_ERROR); return end
             local target = current_config
-            Confirm.ask("HE IS SURE?", "Delete: " .. target, function()
+            Confirm.ask("ARE YOU SURE?", "Delete: " .. target, function()
                 if ConfigSys.delete(target) then
                     notify("Config", "Deleted: " .. target, 2, "success")
                     if current_config == target then selectConfig("") end
+                    flashButton(delBtn, C_ERROR)
                 else notify("Config", "Failed to delete", 2, "error") end
             end)
         end },
     })
-    addButtonRow(settingsPage, 14, {
+    loadBtn, delBtn = row2[1], row2[2]
+
+    local row3 = addButtonRow(settingsPage, 14, {
         { text = "Refresh Configs", callback = function()
             local configs = refreshConfigs()
             notify("Config", "Refreshed: " .. #configs .. " found.", 2, "info")
             local exists = false
-            for _, name in ipairs(configs) do if name == current_config then exists = true; break end end
+            for _, name in ipairs(configs) do if name == current_config then exists = true break end end
             if not exists and current_config ~= "" then selectConfig("") end
             cfgDropdown.refresh()
+            flashButton(refBtn, Theme.c.accent)
         end },
     })
-    addToggle(settingsPage, "auto_load_config", "Auto Load Config", 15, function(state)
-        persistAutoload()
-        if state and current_config ~= "" then notify("Config", "Auto load on: " .. current_config, 2, "success")
-        elseif state then notify("Config", "Auto load ON (select a config)", 2, "warn") end
-    end)
-    do
-        local al = ConfigSys.readAutoload()
-        if al and al.enabled == true and type(al.config) == "string" and al.config ~= "" then
-            setOption("auto_load_config", true)
-            setOption("last_selected_config", al.config)
-            current_config = al.config
-            cfgDropdown.refresh()
-        end
-    end
-
-    -- APPEARANCE
-    addSectionHeader(settingsPage, "APPEARANCE", 20)
-    addButtonRow(settingsPage, 21, {
-        { text = "Pumpkin", hoverColor = Color3.fromRGB(255,112,22), callback = function() Theme.set(Color3.fromRGB(255,112,22)); notify("Theme", "Pumpkin", 2) end },
-        { text = "Witch", hoverColor = Color3.fromRGB(170,90,255), callback = function() Theme.set(Color3.fromRGB(170,90,255)); notify("Theme", "Witch", 2) end },
-        { text = "Slime", hoverColor = Color3.fromRGB(120,230,70), callback = function() Theme.set(Color3.fromRGB(120,230,70)); notify("Theme", "Slime", 2) end },
-        { text = "Blood", hoverColor = Color3.fromRGB(225,35,55), callback = function() Theme.set(Color3.fromRGB(225,35,55)); notify("Theme", "Blood", 2) end },
-    })
-
-    -- COMBAT
-    addSectionHeader(settingsPage, "COMBAT", 30)
-    addToggle(settingsPage, "auto_kill_hulk", "Auto Kill Hulk", 31, function(v)
-        Game.AutoKill.setEnabled(v)
-        notify("Auto Kill Hulk", v and "Watching for transformation" or "Disabled", 2, v and "success" or "info")
-    end)
-    addClickButton(settingsPage, "Kill Hulk Button", CLICK_ICON, 32, function()
-        local ok = Game.Fling.fire()
-        notify("Kill Hulk", ok and "Fling started" or "No Hulk / abort", 2, ok and "success" or "warn")
-    end)
-    addSlider(settingsPage, "fling_predict", "Kill Predict", -100, 100, 33, function(v) Game.Fling.predictOffset = v end)
-    if Options["fling_predict"] == nil then Options["fling_predict"] = 1 end
-    Game.Fling.predictOffset = Options["fling_predict"] or 1
-    addSlider(settingsPage, "fling_speed", "Speed Kill", 100, 1200, 34, function(v)
-        Game.Fling.linearForce = v
-        Game.Fling.spinForce = v * FLING_SPIN_MULT
-        Game.AutoKill.burstForce = v
-        Game.AutoKill.burstSpin = v * FLING_SPIN_MULT
-    end)
-    if Options["fling_speed"] == nil then Options["fling_speed"] = DEFAULT_FLING_SPEED end
-    Game.Fling.linearForce = Options["fling_speed"] or DEFAULT_FLING_SPEED
-    Game.Fling.spinForce = Game.Fling.linearForce * FLING_SPIN_MULT
-    Game.AutoKill.burstForce = Game.Fling.linearForce
-    Game.AutoKill.burstSpin = Game.Fling.spinForce
-    addToggle(settingsPage, "auto_punch", "Auto Punch (Hulk)", 35, function(v)
-        Game.AutoPunch.setEnabled(v)
-        notify("Auto Punch", v and "ON — firing HulkAttack" or "OFF", 2, v and "success" or "info")
-    end)
-
-    -- HULK ESP
-    addSectionHeader(settingsPage, "HULK ESP", 40)
-    addToggle(settingsPage, "esp_hulk", "ESP Hulk", 41, function(v) Game.PlayerESP.setFlag("hulk", v) end)
-    addToggle(settingsPage, "esp_hulkbuster", "ESP Hulkbuster", 42, function(v) Game.PlayerESP.setFlag("hulkbuster", v) end)
-    addToggle(settingsPage, "esp_survivor", "ESP Survivor", 43, function(v) Game.PlayerESP.setFlag("survivor", v) end)
-    addToggle(settingsPage, "esp_weapons", "ESP Weapons", 44, function(v) Game.PlayerESP.setFlag("weapon", v) end)
-    addToggle(settingsPage, "esp_ability", "ESP Ability Owners", 45, function(v) Game.PlayerESP.setFlag("abilityHighlight", v) end)
-    addColorPicker(settingsPage, "esp_color", "ESP Color", 46)
-
-    -- WORLD ESP
-    addSectionHeader(settingsPage, "WORLD ESP", 50)
-    addToggle(settingsPage, "esp_vents", "ESP Vents", 51, function(v) if v then Game.EspVents.enable() else Game.EspVents.disable() end end)
-    addToggle(settingsPage, "esp_cabinet", "ESP Cabinet", 52, function(v) if v then Game.EspCabinet.enable() else Game.EspCabinet.disable() end end)
-
-    -- INTEL
-    addSectionHeader(settingsPage, "INTEL", 60)
-    addToggle(settingsPage, "esp_hulk_chance", "ESP Hulk Probability + Pity", 61, function(v) if v then Game.ChanceESP.enable() else Game.ChanceESP.disable() end end)
-    addToggle(settingsPage, "hulk_alert", "Hulk Alert", 62, function(v) if v then Game.HulkAlert.enable() else Game.HulkAlert.disable() end end)
-    addToggle(settingsPage, "live_event", "Live Event", 63, function(v) if v then Game.EventLog.enable() else Game.EventLog.disable() end end)
-
-    -- SURVIVOR
-    addSectionHeader(settingsPage, "SURVIVOR", 70)
-    addToggle(settingsPage, "infinite_stamina", "Infinite Stamina", 71, function(v) if v then Game.InfiniteStamina.enable() else Game.InfiniteStamina.disable() end end)
-    addToggle(settingsPage, "anti_ragdoll", "Anti Ragdoll", 72, function(v) if v then Game.AntiRagdoll.enable() else Game.AntiRagdoll.disable() end end)
-
-    -- JUMP
-    addSectionHeader(settingsPage, "JUMP", 80)
-    addToggle(settingsPage, "jump_enabled", "JumpPower", 81, function(v) Game.PlayerState.jumpEnabled = v; Game.applyPlayerState() end)
-    addSlider(settingsPage, "jump_value", "JumpPower Value", 50, 500, 82, function(v) Game.PlayerState.jumpPower = v; if Game.PlayerState.jumpEnabled then Game.applyPlayerState() end end)
-    if Options["jump_value"] == nil then Options["jump_value"] = 50 end
-    Game.PlayerState.jumpPower = Options["jump_value"] or 50
-    Game.PlayerState.jumpEnabled = Options["jump_enabled"] == true
-
-    -- SPEED
-    addSectionHeader(settingsPage, "SPEED", 90)
-    addToggle(settingsPage, "tpwalk_enabled", "Speed Power", 91, function(v) Game.PlayerState.speedPower = v end)
-    addSlider(settingsPage, "tp_speed", "Speed Power Value", 1, 50, 92, function(v) Game.PlayerState.tpSpeed = v end)
-    if Options["tp_speed"] == nil then Options["tp_speed"] = 3 end
-    Game.PlayerState.tpSpeed = Options["tp_speed"] or 3
-    Game.PlayerState.speedPower = Options["tpwalk_enabled"] == true
-
-    -- ESCAPE
-    addSectionHeader(settingsPage, "ESCAPE", 100)
-    addToggle(settingsPage, "auto_escape", "Auto Escape", 101, function(v)
-        Game.Panic.setAuto(v)
-        notify("Auto Escape", v and "Watching Hulk distance" or "Disabled", 2, v and "success" or "info")
-    end)
-    addClickButton(settingsPage, "Escape Button", CLICK_ICON, 102, function()
-        local ok = Game.Panic.fireManual()
-        notify("Escape", ok and "Teleported" or "No safe spot / cooldown", 2, ok and "success" or "warn")
-    end)
-
-    -- AUTOMATION
-    addSectionHeader(settingsPage, "AUTOMATION", 110)
-    addToggle(settingsPage, "auto_mission", "Auto Mission", 111, function(v) Game.AutoMission.setEnabled(v) end)
-
-    -- ABILITY SPIN
-    addSectionHeader(settingsPage, "ABILITY SPIN", 120)
-    addToggle(settingsPage, "spin_ability", "Spin Ability", 121, function(v) Game.SpinSystem.setEnabled(v) end)
-    Game.addAbilityList(settingsPage, 122)
-
-    -- UTILITY
-    addSectionHeader(settingsPage, "UTILITY", 130)
-    addToggle(settingsPage, "anti_debris", "Anti Debris", 131, function(v) if v then Game.AntiDebris.enable() else Game.AntiDebris.disable() end end)
-    addToggle(settingsPage, "remove_doors", "Remove Doors", 132, function(v) if v then Game.Doors.enable() else Game.Doors.disable() end end)
+    refBtn = row3[1]
 end
 
--- ===== TABS =====
+addSectionHeader(settingsPage, "AUTOMATION", 20)
+addToggle(settingsPage, "auto_load_config", "Auto Load Config", 21, function(state)
+    persistAutoload()
+    if state and current_config ~= "" then notify("Config", "Auto load: " .. current_config, 2, "success")
+    elseif state then notify("Config", "Auto load ON (select a config)", 2, "warn") end
+end)
+
+addSectionHeader(settingsPage, "APPEARANCE", 30)
+do
+    local function preset(text, color)
+        return { text = text, hoverColor = color, callback = function()
+            Theme.set(color)
+            notify("Theme", text .. " theme applied.", 2)
+        end }
+    end
+    addButtonRow(settingsPage, 31, {
+        preset("Pumpkin", ORIGINAL_THEME.accent),
+        preset("Witch", Color3.fromRGB(170, 90, 255)),
+        preset("Slime", Color3.fromRGB(120, 230, 70)),
+        preset("Blood", Color3.fromRGB(225, 35, 55)),
+    })
+end
+
+-- ====================================================================================================
+-- TABS
+-- ====================================================================================================
 local tabButtons, activeTab = {}, nil
 local entranceToken = 0
+
 local function tabY(i) return TAB_TOP + (i - 1) * (TAB_H + TAB_GAP) end
 
 local function renderTab(name, animate)
-    local data = tabButtons[name]; if not data then return end
-    local c = Theme.c; local d = animate and 0.22 or 0
+    local data = tabButtons[name]
+    if not data then return end
+    local c = Theme.c
+    local d = animate and 0.22 or 0
     local active = activeTab == name
     local col = active and c.textActive or (data.hover and TEXT or TEXT_DIM)
     apply(data.icon, { ImageColor3 = col, Size = active and UDim2.fromOffset(20, 20) or UDim2.fromOffset(18, 18), Position = active and UDim2.new(0, 11, 0.5, -10) or UDim2.new(0, 12, 0.5, -9) }, d, Enum.EasingStyle.Back)
@@ -2906,7 +3360,9 @@ local function playEntrance(page)
         if card then
             card.Position = UDim2.new(0, 18, 0, 0)
             task.delay((i - 1) * 0.04, function()
-                if entranceToken == my and card.Parent then tween(card, { Position = UDim2.new(0, 0, 0, 0) }, 0.4, Enum.EasingStyle.Quint) end
+                if entranceToken == my and card.Parent then
+                    tween(card, { Position = UDim2.new(0, 0, 0, 0) }, 0.4, Enum.EasingStyle.Quint)
+                end
             end)
         end
     end
@@ -2916,7 +3372,9 @@ local function selectTab(name, silent, force)
     if activeTab == name and not force then return end
     local prev = activeTab
     activeTab = name
-    Popup.close(); Tooltip.hide()
+    Popup.close()
+    Tooltip.hide()
+    if not silent then playSound(SOUND_TAB, 0.35) end
     local idx = tabButtons[name].index
     tween(tabIndicator, { Position = UDim2.fromOffset(8, tabY(idx)) }, silent and 0 or 0.32, Enum.EasingStyle.Quint)
     if prev then renderTab(prev, true) end
@@ -2927,8 +3385,14 @@ local function selectTab(name, silent, force)
 end
 
 for i, tab in ipairs(TABS) do
-    local btn = new("TextButton", { Size = UDim2.fromOffset(tabW, TAB_H), Position = UDim2.fromOffset(8, tabY(i)), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 3, Parent = sidebar })
-    local icon = new("ImageLabel", { Size = UDim2.fromOffset(18, 18), Position = UDim2.new(0, 12, 0.5, -9), BackgroundTransparency = 1, Image = tab.icon, ImageColor3 = TEXT_DIM, ZIndex = 4, Parent = btn })
+    local btn = new("TextButton", {
+        Size = UDim2.fromOffset(tabW, TAB_H), Position = UDim2.fromOffset(8, tabY(i)), BackgroundTransparency = 1, Text = "",
+        AutoButtonColor = false, ZIndex = 3, Parent = sidebar,
+    })
+    local icon = new("ImageLabel", {
+        Size = UDim2.fromOffset(18, 18), Position = UDim2.new(0, 12, 0.5, -9), BackgroundTransparency = 1, Image = tab.icon,
+        ImageColor3 = TEXT_DIM, ZIndex = 4, Parent = btn,
+    })
     local label = newLabel(btn, tab.name, 12, FONT_MAIN, TEXT_DIM, { Size = UDim2.new(1, -44, 1, 0), Position = UDim2.new(0, 40, 0, 0), ZIndex = 4 })
     local data = { btn = btn, icon = icon, label = label, index = i, hover = false }
     tabButtons[tab.name] = data
@@ -2936,9 +3400,13 @@ for i, tab in ipairs(TABS) do
     btn.MouseLeave:Connect(function() data.hover = false renderTab(tab.name, true) end)
     btn.MouseButton1Click:Connect(function() selectTab(tab.name) end)
 end
-Theme.reg(sidebar, function(_, a) for n in pairs(tabButtons) do renderTab(n, a) end end)
+Theme.reg(sidebar, function(_, a)
+    for n in pairs(tabButtons) do renderTab(n, a) end
+end)
 
--- ===== DRAG / RESIZE / RENDER LOOP =====
+-- ====================================================================================================
+-- DRAG / RESIZE / RENDER
+-- ====================================================================================================
 local posX, posY, tgtX, tgtY = 0, 0, 0, 0
 local dragging, dragOrigin, startX, startY = false, nil, 0, 0
 local isMin, isAnim = false, false
@@ -2995,7 +3463,9 @@ end)
 dragCatcher.InputBegan:Connect(function(input)
     if isAnim or isMin or resizing then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true; dragOrigin = input.Position; startX, startY = tgtX, tgtY
+        dragging = true
+        dragOrigin = input.Position
+        startX, startY = tgtX, tgtY
         Popup.close(); Tooltip.hide()
     end
 end)
@@ -3007,7 +3477,9 @@ bind(UserInputService.InputChanged, function(input)
     end
 end)
 bind(UserInputService.InputEnded, function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
 end)
 
 local premiumClock = 0
@@ -3024,10 +3496,22 @@ bind(RunService.RenderStepped, function(dt)
     premiumGrad.Offset = Vector2.new(-1 + ((premiumClock * 0.45) % 2.4) - 0.2, 0)
 end)
 
--- ===== MINIMIZE BALL =====
+task.spawn(function()
+    task.wait(1.6)
+    while alive and headerShine.Parent do
+        if SHINE_ENABLED and not isMin then
+            headerShine.Position = UDim2.new(0, -UI_SHINE.Width - 20, 0.5, 0)
+            tween(headerShine, { Position = UDim2.new(1, 20, 0.5, 0) }, UI_SHINE.Speed, Enum.EasingStyle.Quart)
+        end
+        task.wait(UI_SHINE.Interval + UI_SHINE.Speed)
+    end
+end)
+
+-- ====================================================================================================
+-- BOLINHA
+-- ====================================================================================================
 local ballHolder
 local ballPos = Vector2.new(16, 16)
-local savedBallPos = ballPos
 
 local function clampBall(p)
     local vp = viewport()
@@ -3038,26 +3522,42 @@ local restore
 
 local function createBall()
     ballPos = clampBall(ballPos)
-    ballHolder = new("Frame", { Name = "BallHolder", Size = UDim2.fromOffset(BALL, BALL), Position = UDim2.fromOffset(ballPos.X, ballPos.Y), BackgroundTransparency = 1, ZIndex = 300, Parent = gui })
+    ballHolder = new("Frame", {
+        Name = "BallHolder", Size = UDim2.fromOffset(BALL, BALL), Position = UDim2.fromOffset(ballPos.X, ballPos.Y),
+        BackgroundTransparency = 1, ZIndex = 300, Parent = gui,
+    })
     local hScale = new("UIScale", { Scale = 0, Parent = ballHolder })
     local pulse = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.fromOffset(BALL, BALL), BackgroundTransparency = 1, ZIndex = 298, Parent = ballHolder })
     corner(pulse, 16)
     local pulseStroke = stroke(pulse, Theme.c.accent, 2, 1)
-    local ball = new("TextButton", { Size = UDim2.fromOffset(BALL, BALL), BackgroundColor3 = BLACK, Text = "", BorderSizePixel = 0, AutoButtonColor = false, ClipsDescendants = true, ZIndex = 300, Parent = ballHolder })
+    local ball = new("TextButton", {
+        Size = UDim2.fromOffset(BALL, BALL), BackgroundColor3 = BLACK, Text = "", BorderSizePixel = 0, AutoButtonColor = false,
+        ClipsDescendants = true, ZIndex = 300, Parent = ballHolder,
+    })
     corner(ball, 16)
     local ballStroke = stroke(ball, Theme.c.accent, 1.5, 0.4)
-    new("ImageLabel", { Size = UDim2.fromOffset(40, 40), Position = UDim2.new(0.5, -20, 0.5, -20), BackgroundTransparency = 1, Image = LOGO_BALL_ICON, ImageColor3 = WHITE, ScaleType = Enum.ScaleType.Fit, ZIndex = 305, Parent = ball })
+    new("ImageLabel", {
+        Size = UDim2.fromOffset(40, 40), Position = UDim2.new(0.5, -20, 0.5, -20), BackgroundTransparency = 1, Image = LOGO_BALL_ICON,
+        ImageColor3 = WHITE, ScaleType = Enum.ScaleType.Fit, ZIndex = 305, Parent = ball,
+    })
+    if HW.EMOJI then
+        new("TextLabel", {
+            AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -1, 0, 1), Size = UDim2.fromOffset(20, 20),
+            BackgroundTransparency = 1, Font = FONT_MAIN, Text = HW.PUMPKIN, TextSize = 14, TextColor3 = WHITE, ZIndex = 306, Parent = ball,
+        })
+    end
     tween(hScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
     task.spawn(function()
-        while alive and ballHolder and pulse.Parent do
-            pulse.Size = UDim2.fromOffset(BALL, BALL); pulseStroke.Transparency = 0.5
+        while alive and pulse.Parent do
+            pulse.Size = UDim2.fromOffset(BALL, BALL)
+            pulseStroke.Transparency = 0.5
             tween(pulse, { Size = UDim2.fromOffset(BALL + 26, BALL + 26) }, 1.6, Enum.EasingStyle.Quad)
             tween(pulseStroke, { Transparency = 1 }, 1.6, Enum.EasingStyle.Quad)
             task.wait(2.4)
         end
     end)
     ball.MouseEnter:Connect(function()
-        tween(ball, { BackgroundColor3 = Color3.fromRGB(22, 22, 28) }, 0.15)
+        tween(ball, { BackgroundColor3 = Color3.fromRGB(34, 18, 46) }, 0.15)
         tween(ballStroke, { Transparency = 0 }, 0.15)
         tween(hScale, { Scale = 1.07 }, 0.15, Enum.EasingStyle.Back)
     end)
@@ -3069,7 +3569,9 @@ local function createBall()
     local bDrag, moved, bStart, bOrigin = false, false, nil, nil
     ball.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            bDrag, moved = true, false; bStart = input.Position; bOrigin = ballPos
+            bDrag, moved = true, false
+            bStart = input.Position
+            bOrigin = ballPos
         end
     end)
     bind(UserInputService.InputChanged, function(input)
@@ -3090,17 +3592,20 @@ local function createBall()
                 local snapX = (ballPos.X + BALL / 2 < vp.X / 2) and 10 or (vp.X - BALL - 10)
                 ballPos = clampBall(Vector2.new(snapX, ballPos.Y))
                 tween(ballHolder, { Position = UDim2.fromOffset(ballPos.X, ballPos.Y) }, 0.3, Enum.EasingStyle.Back)
-                savedBallPos = ballPos
-            elseif not moved then restore() end
+            elseif not moved then
+                restore()
+            end
         end
     end)
 end
 
 local function minimize()
     if isAnim or isMin then return end
-    isAnim = true; Popup.close(); Tooltip.hide()
+    isAnim = true
+    Popup.close(); Tooltip.hide()
     local cx, cy = ballPos.X + BALL / 2, ballPos.Y + BALL / 2
     tween(canvas, { GroupTransparency = 1 }, 0.24)
+    if HW.decor then tween(HW.decor, { GroupTransparency = 1 }, 0.24) end
     tween(popScale, { Scale = 0.35 }, 0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
     tween(root, { Position = UDim2.fromOffset(cx, cy) }, 0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
     setShadow(false, 0.2)
@@ -3114,8 +3619,8 @@ restore = function()
     if isAnim or not isMin then return end
     isAnim = true
     local lx, ly = ballPos.X + BALL / 2, ballPos.Y + BALL / 2
-    savedBallPos = ballPos
-    local holder = ballHolder; ballHolder = nil
+    local holder = ballHolder
+    ballHolder = nil
     if holder then
         local sc = holder:FindFirstChildOfClass("UIScale")
         if sc then tween(sc, { Scale = 0 }, 0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In) end
@@ -3124,15 +3629,20 @@ restore = function()
     task.wait(0.18)
     root.Visible = true
     root.Position = UDim2.fromOffset(lx, ly)
-    canvas.GroupTransparency = 1; popScale.Scale = 0.35
+    canvas.GroupTransparency = 1
+    popScale.Scale = 0.35
     tween(root, { Position = UDim2.new(0.5, posX, 0.5, posY) }, 0.45, Enum.EasingStyle.Back)
     tween(popScale, { Scale = 1 }, 0.45, Enum.EasingStyle.Back)
     tween(canvas, { GroupTransparency = 0 }, 0.3)
+    if HW.decor then tween(HW.decor, { GroupTransparency = HW.DECOR_ALPHA }, 0.5) end
     setShadow(true, 0.4)
     task.delay(0.46, function() isMin = false; isAnim = false end)
 end
 
-minimizeBtn.MouseButton1Click:Connect(function() task.spawn(minimize) end)
+minimizeBtn.MouseButton1Click:Connect(function()
+    playSound(SOUND_TAB, 0.35)
+    task.spawn(minimize)
+end)
 bind(UserInputService.InputBegan, function(input, gpe)
     if gpe then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -3140,12 +3650,27 @@ bind(UserInputService.InputBegan, function(input, gpe)
     end
 end)
 
--- ===== CLOSE / DESTROY =====
+-- ====================================================================================================
+-- FECHAR / DESCARREGAR
+-- ====================================================================================================
 local function destroyAll()
     if not alive then return end
     alive = false
-    for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+    pcall(function() InfiniteStamina.disable() end)
+    pcall(function() AntiRagdoll.disable() end)
+    pcall(function() EspVents.disable() end)
+    pcall(function() EspCabinet.disable() end)
+    pcall(function() Doors.disable() end)
+    pcall(function() EventLog.disable() end)
+    pcall(function() HulkAlert.disable() end)
+    pcall(function() ChanceESP.disable() end)
+    pcall(function() AntiDebris.disable() end)
+    pcall(function() Rewards.disable() end)
+    pcall(function() Panic.setAuto(false) end)
+    pcall(function() AutoKill.setEnabled(false) end)
+    pcall(function() peClearAll() end)
     pcall(function() RunService:UnbindFromRenderStep("BabisAntiRagdoll") end)
+    for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
     pcall(function() gui:Destroy() end)
     Confirm.destroy()
     task.delay(6, Notifier.destroy)
@@ -3160,46 +3685,69 @@ local function closeWindow()
     Popup.close()
     if isMin then destroyAll(); return end
     tween(canvas, { GroupTransparency = 1 }, 0.25)
+    if HW.decor then tween(HW.decor, { GroupTransparency = 1 }, 0.25) end
     tween(popScale, { Scale = 0.88 }, 0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
     setShadow(false, 0.2)
     task.delay(0.3, destroyAll)
 end
+
 local function askClose()
-    if Confirm then Confirm.ask("HE IS SURE?", "", closeWindow) else closeWindow() end
+    if Confirm then Confirm.ask("ARE YOU SURE?", "", closeWindow) else closeWindow() end
 end
-closeBtnHeader.MouseButton1Click:Connect(function() askClose() end)
+closeBtnHeader.MouseButton1Click:Connect(function()
+    playSound(SOUND_TAB, 0.35)
+    askClose()
+end)
 
-local floatClose = new("TextButton", { Name = "FloatClose", Size = UDim2.fromOffset(40, 40), Position = UDim2.new(1, -54, 0, 12), BackgroundColor3 = Theme.c.bgMain, Text = "✕", TextColor3 = TEXT, TextSize = 18, Font = FONT_STRONG, AutoButtonColor = false, BorderSizePixel = 0, ZIndex = 400, Parent = gui })
-corner(floatClose, 20)
-local fcStroke = stroke(floatClose, Theme.c.border, 1, 0.1)
-Theme.bind(floatClose, "BackgroundColor3", "bgMain"); Theme.bind(fcStroke, "Color", "border")
-floatClose.MouseEnter:Connect(function() tween(floatClose, { BackgroundColor3 = C_ERROR:Lerp(BLACK, 0.55), TextColor3 = WHITE }, 0.15); tween(fcStroke, { Color = C_ERROR }, 0.15) end)
-floatClose.MouseLeave:Connect(function() tween(floatClose, { BackgroundColor3 = Theme.c.bgMain, TextColor3 = TEXT }, 0.18); tween(fcStroke, { Color = Theme.c.border }, 0.18) end)
-floatClose.MouseButton1Click:Connect(function() askClose() end)
-
--- ===== INIT =====
+-- ====================================================================================================
+-- INICIALIZACAO
+-- ====================================================================================================
 if typeof(Options.theme_color) == "Color3" and not colorMatch(Options.theme_color, ORIGINAL_THEME.accent, 0.004) then
     Theme.set(Options.theme_color)
 end
 
-selectTab("Settings", true, true)
+do
+    local al = ConfigSys.readAutoload()
+    if al and al.enabled == true and type(al.config) == "string" and al.config ~= "" then
+        setOption("auto_load_config", true)
+        setOption("last_selected_config", al.config)
+        current_config = al.config
+        if Registry["auto_load_config"] then Registry["auto_load_config"](true) end
+        cfgDropdown.refresh()
+    end
+end
+
+playSound(SOUND_ENTRY, 1)
+
+selectTab("Main", true, true)
 for i, tab in ipairs(TABS) do
     local b = tabButtons[tab.name].btn
     b.Position = UDim2.fromOffset(-24, tabY(i))
-    task.delay(0.15 + i * 0.05, function() if b.Parent then tween(b, { Position = UDim2.fromOffset(8, tabY(i)) }, 0.45, Enum.EasingStyle.Back) end end)
+    task.delay(0.15 + i * 0.05, function()
+        if b.Parent then tween(b, { Position = UDim2.fromOffset(8, tabY(i)) }, 0.45, Enum.EasingStyle.Back) end
+    end)
 end
 root.Rotation = -4
 task.delay(0.12, function()
     if not alive then return end
     tween(canvas, { GroupTransparency = 0 }, 0.4, Enum.EasingStyle.Quad)
+    if HW.decor then tween(HW.decor, { GroupTransparency = HW.DECOR_ALPHA }, 0.8, Enum.EasingStyle.Quad) end
     tween(popScale, { Scale = 1 }, 0.6, Enum.EasingStyle.Back)
     tween(root, { Rotation = 0 }, 0.6, Enum.EasingStyle.Back)
     setShadow(true, 0.6)
 end)
 
-for _, k in ipairs(PERSIST_KEYS) do
-    if Options[k] ~= nil and Registry[k] then pcall(Registry[k], Options[k]) end
+if Options.auto_load_config and current_config ~= "" then
+    local data = ConfigSys.load(current_config)
+    if data then
+        task.delay(0.9, function()
+            if not alive then return end
+            local applied = deserializeOptions(data)
+            applyToUI(applied)
+            notify("Config", "Auto-Loaded: " .. current_config, 2, "success")
+        end)
+    end
 end
 
-print("[Babis] ready")
+print("[Babis UI] Halloween Shell + Hulk PAID carregado.")
 return true
