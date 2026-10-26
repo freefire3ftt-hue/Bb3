@@ -1,12 +1,14 @@
 --[[ ============================================================
-     ardv2.lua
-     Library (Halloween UI) + Hulk options (Settings only)
-     Cole o `local Game = (function() ... end)()` do v2.8 no
-     marker [PASTE GAME BACKEND AQUI].
+     ardv2.lua — Library + Hulk options (Settings only)
+     Sem WebShotCam. Sem som, sem morcego, sem neblina.
+     [1] Library completa — não mexer.
+     [2] BACKEND — cola teu `local Game = (function()...end)()`
+         v2.8 puro dentro do marker.
+     [3] App — monta a página Settings com todas as opções do Hulk.
      ============================================================ ]]
 
 -- ╔══════════════════════════════════════════════════════════╗
--- ║ PART 1 — LIBRARY                                         ║
+-- ║ [1] LIBRARY                                              ║
 -- ╚══════════════════════════════════════════════════════════╝
 local Library = (function()
 
@@ -40,16 +42,16 @@ local FONT_MAIN   = Enum.Font.GothamBold
 local FONT_STRONG = Enum.Font.GothamBlack
 local FONT_CODE   = Enum.Font.Code
 
-local LOGO_ICON        = "rbxassetid://88981628950457"
-local LOGO_BALL_ICON   = "rbxassetid://78039301847826"
-local BELL_ICON        = "rbxassetid://7072706001"
-local ARROW_ICON       = "rbxassetid://7734034764"
-local MIN_ICON         = "rbxassetid://7734000129"
-local CLOSE_ICON       = "rbxassetid://7743878857"
-local DISCORD_ICON     = "rbxassetid://100770414662869"
-local DISCORD_TINT     = Color3.fromRGB(115, 136, 217)
-local DISCORD_URL      = "https://discord.gg/ZvCwj68e"
-local CHECK_ICON       = "rbxassetid://111774854328409"
+local LOGO_ICON      = "rbxassetid://88981628950457"
+local LOGO_BALL_ICON = "rbxassetid://78039301847826"
+local BELL_ICON      = "rbxassetid://7072706001"
+local ARROW_ICON     = "rbxassetid://7734034764"
+local MIN_ICON       = "rbxassetid://7734000129"
+local CLOSE_ICON     = "rbxassetid://7743878857"
+local DISCORD_ICON   = "rbxassetid://100770414662869"
+local DISCORD_TINT   = Color3.fromRGB(115, 136, 217)
+local DISCORD_URL    = "https://discord.gg/ZvCwj68e"
+local CHECK_ICON     = "rbxassetid://111774854328409"
 
 local DESIGN_W, DESIGN_H = 720, 470
 local HEADER_H   = 60
@@ -453,7 +455,6 @@ local function newWindow(opts)
 
     local overlay = new("Frame", { Name = "Overlay", Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, ZIndex = 100, Parent = canvas })
 
-    -- Grip resize
     local grip = new("TextButton", { Size = UDim2.fromOffset(22,22), AnchorPoint = Vector2.new(1,1), Position = UDim2.new(1,-4,1,-4),
         BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 65, Parent = canvas })
     local gripDots = {}
@@ -465,7 +466,6 @@ local function newWindow(opts)
     grip.MouseEnter:Connect(function() for _, d in ipairs(gripDots) do tween(d, { BackgroundColor3 = Theme.c.accent, BackgroundTransparency = 0 }, 0.12) end end)
     grip.MouseLeave:Connect(function() for _, d in ipairs(gripDots) do tween(d, { BackgroundColor3 = TEXT_MUTED, BackgroundTransparency = 0.3 }, 0.15) end end)
 
-    -- Header
     local header = new("Frame", { Name = "Header", Size = UDim2.new(1,0,0,HEADER_H), BackgroundColor3 = Theme.c.bgHeader,
         BorderSizePixel = 0, ClipsDescendants = true, ZIndex = 4, Parent = canvas })
     Theme.bind(header, "BackgroundColor3", "bgHeader")
@@ -547,7 +547,6 @@ local function newWindow(opts)
         task.delay(1.5, function() discordBusy = false end)
     end)
 
-    -- Sidebar
     local sidebar = new("Frame", { Size = UDim2.new(0,SIDEBAR_W,1,-HEADER_H), Position = UDim2.new(0,0,0,HEADER_H),
         BackgroundColor3 = Theme.c.bgHeader, BorderSizePixel = 0, ZIndex = 3, Parent = canvas })
     Theme.bind(sidebar, "BackgroundColor3", "bgHeader")
@@ -572,7 +571,6 @@ local function newWindow(opts)
     newLabel(profile, LP.DisplayName ~= "" and LP.DisplayName or LP.Name, 12, FONT_MAIN, TEXT, { Size = UDim2.new(1,-52,0,16), Position = UDim2.new(0,48,0.5,-16), TextTruncate = Enum.TextTruncate.AtEnd })
     newLabel(profile, "@"..LP.Name, 10, FONT_MAIN, TEXT_MUTED, { Size = UDim2.new(1,-52,0,14), Position = UDim2.new(0,48,0.5,1), TextTruncate = Enum.TextTruncate.AtEnd })
 
-    -- Single "Settings" tab
     local tabIndicator = new("Frame", { Size = UDim2.fromOffset(SIDEBAR_W-18,38), Position = UDim2.fromOffset(8,12),
         BackgroundColor3 = Theme.c.bgMain, BorderSizePixel = 0, ZIndex = 1, Parent = sidebar })
     corner(tabIndicator, 9)
@@ -583,11 +581,10 @@ local function newWindow(opts)
     corner(indBar, 2); Theme.bind(indBar, "BackgroundColor3", "accent")
     local tabBtn = new("TextButton", { Size = UDim2.fromOffset(SIDEBAR_W-18,38), Position = UDim2.fromOffset(8,12),
         BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 3, Parent = sidebar })
-    local tabIcon = new("ImageLabel", { Size = UDim2.fromOffset(20,20), Position = UDim2.new(0,11,0.5,-10),
+    new("ImageLabel", { Size = UDim2.fromOffset(20,20), Position = UDim2.new(0,11,0.5,-10),
         BackgroundTransparency = 1, Image = "rbxassetid://7734053495", ImageColor3 = Theme.c.textActive, ZIndex = 4, Parent = tabBtn })
     newLabel(tabBtn, "Settings", 12, FONT_MAIN, Theme.c.textActive, { Size = UDim2.new(1,-44,1,0), Position = UDim2.new(0,40,0,0), ZIndex = 4 })
 
-    -- Content
     local contentGroup = new("CanvasGroup", { Size = UDim2.new(1,-SIDEBAR_W,1,-HEADER_H), Position = UDim2.new(0,SIDEBAR_W,0,HEADER_H),
         BackgroundTransparency = 1, GroupTransparency = 0, ZIndex = 2, Parent = canvas })
 
@@ -627,7 +624,6 @@ local function newWindow(opts)
         Debris:AddItem(r, 0.7)
     end
 
-    -- Tooltip + Popup
     local Tooltip = {}
     local tip = new("TextLabel", { BackgroundColor3 = Theme.c.bgMain, BackgroundTransparency = 1, TextTransparency = 1,
         Font = FONT_MAIN, TextSize = 11, TextColor3 = TEXT, Text = "", BorderSizePixel = 0, ZIndex = 200,
@@ -715,7 +711,6 @@ local function newWindow(opts)
         Popup.current = { frame = pf, backdrop = backdrop, anchor = anchor, arrow = spec.arrow, w = totalW }
     end
 
-    -- Halloween decorations
     do
         local decor = new("CanvasGroup", { Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, GroupTransparency = 0.12, ZIndex = 2, Parent = root })
         corner(decor, CORNER)
@@ -768,7 +763,6 @@ local function newWindow(opts)
         end)
     end
 
-    -- Drag / resize
     local posX, posY, tgtX, tgtY = 0,0,0,0
     local dragging, dragOrigin, startX, startY = false, nil, 0, 0
     local isMin, isAnim, resizing = false, false, false
@@ -835,7 +829,6 @@ local function newWindow(opts)
         end
     end)
 
-    -- Minimize ball
     local ballHolder, ballPos = nil, Vector2.new(16,16)
     local function clampBall(p)
         local vp = viewport()
@@ -931,7 +924,6 @@ local function newWindow(opts)
         end
     end)
 
-    -- Page object
     local page = { _frame = pageFrame }
 
     function page.section(text, order)
@@ -1228,7 +1220,6 @@ local function newWindow(opts)
         return buttons
     end
 
-    -- Unload + close
     local function destroyAll()
         if not alive then return end
         alive = false
@@ -1308,3 +1299,244 @@ return {
 
 end)()
 -- ╚══════════════════ END LIBRARY ══════════════════╝
+
+-- ╔══════════════════════════════════════════════════════════╗
+-- ║ [2] BACKEND — COLA TEU v2.8 AQUI                         ║
+-- ║                                                          ║
+-- ║ Substitui o bloco stub inteiro pelo `local Game =         ║
+-- ║ (function() ... end)()` do teu ardv2.lua v2.8.            ║
+-- ║                                                          ║
+-- ║ Se quiser testar só a UI primeiro, deixa o stub — os      ║
+-- ║ toggles vão clicar/animar mas não vão chamar nada no jogo.║
+-- ╚══════════════════════════════════════════════════════════╝
+local Game = (function()
+    local noop = function() end
+    local noopFalse = function() return false end
+    return {
+        AutoKill        = { setEnabled = noop },
+        Fling           = { fire = noopFalse, predictOffset = 1, linearForce = 400, spinForce = 12000 },
+        PlayerESP       = { setFlag = noop },
+        ChanceESP       = { enable = noop, disable = noop },
+        EspVents        = { enable = noop, disable = noop },
+        EspCabinet      = { enable = noop, disable = noop },
+        AntiDebris      = { enable = noop, disable = noop },
+        EventLog        = { enable = noop, disable = noop },
+        HulkAlert       = { enable = noop, disable = noop },
+        Panic           = { setAuto = noop, fireManual = noopFalse },
+        InfiniteStamina = { enable = noop, disable = noop },
+        AntiRagdoll     = { enable = noop, disable = noop },
+        PlayerState     = { jumpEnabled = false, speedPower = false, jumpPower = 50, tpSpeed = 3 },
+        applyPlayerState = noop,
+        AutoPunch       = { setEnabled = noop },
+        AutoMission     = { setEnabled = noop },
+        SpinSystem      = { setEnabled = noop },
+        Doors           = { enable = noop, disable = noop },
+    }
+end)()
+
+-- ╔══════════════════════════════════════════════════════════╗
+-- ║ [3] APP — Settings page com todas as opções do Hulk      ║
+-- ╚══════════════════════════════════════════════════════════╝
+
+local HULK_KEYS = {
+    "auto_kill_hulk", "fling_predict", "fling_speed", "auto_punch",
+    "esp_hulk", "esp_hulkbuster", "esp_survivor", "esp_weapons", "esp_ability",
+    "esp_vents", "esp_cabinet", "esp_hulk_chance", "hulk_alert", "live_event",
+    "infinite_stamina", "anti_ragdoll", "jump_enabled", "jump_value",
+    "tpwalk_enabled", "tp_speed", "auto_escape",
+    "auto_mission", "anti_debris", "remove_doors",
+}
+do
+    local merged = {}
+    for _, k in ipairs(Library.persistKeys) do merged[#merged+1] = k end
+    for _, k in ipairs(HULK_KEYS) do merged[#merged+1] = k end
+    Library.setPersistKeys(merged)
+end
+
+local Win = Library.newWindow({ subtitle = "Survive The Hulk", premium = "Halloween Edition" })
+local S = Win.settings
+
+-- CONFIGURATION
+S:section("CONFIGURATION", 0)
+local nameBox = S:textbox(nil, "Config Name", 10, nil, "Enter preset name...")
+local current_config = tostring(Library.options.last_selected_config or "")
+local cfgDropdown
+local function refreshConfigs() return Library.config.list() end
+local function persistAutoload()
+    if Library.options.auto_load_config and current_config ~= "" then
+        Library.config.writeAutoload(true, current_config)
+    else
+        Library.config.writeAutoload(false, current_config)
+    end
+end
+local function selectConfig(name)
+    current_config = name or ""
+    Library.setOption("last_selected_config", current_config)
+    if cfgDropdown then cfgDropdown.refresh() end
+    if Library.options.auto_load_config then persistAutoload() end
+end
+cfgDropdown = S:dropdown("Selected Config", 11, {
+    header = "Configs",
+    getOptions = refreshConfigs,
+    get = function() return current_config end,
+    set = function(name) selectConfig(name) end,
+    empty = "No configs found",
+})
+S:buttonRow(12, {
+    { text = "Create Config", callback = function()
+        local name = Library.config.sanitize(nameBox.Text)
+        if name == "" then Library.notify("Config", "Enter a name first", 2, "error"); return end
+        if Library.config.exists(name) then Library.notify("Config", "Already exists: "..name, 2.5, "warn"); return end
+        if Library.config.save(name, Library.serialize()) then
+            nameBox.Text = ""; Library.notify("Config", "Created: "..name, 2, "success"); selectConfig(name)
+        else Library.notify("Config", "Failed to create", 2, "error") end
+    end },
+    { text = "Save Config", callback = function()
+        if current_config ~= "" then
+            if Library.config.save(current_config, Library.serialize()) then
+                Library.notify("Config", "Saved: "..current_config, 2, "success")
+            else Library.notify("Config", "Failed to save", 2, "error") end
+        else Library.notify("Config", "No config selected", 2, "error") end
+    end },
+})
+S:buttonRow(13, {
+    { text = "Load Config", callback = function()
+        if current_config ~= "" then
+            local data = Library.config.load(current_config)
+            if data then
+                local applied = Library.deserialize(data)
+                for k, _ in pairs(applied) do
+                    if Library.registry[k] then pcall(Library.registry[k], Library.options[k]) end
+                end
+                Library.notify("Config", "Loaded: "..current_config, 2, "success")
+            else Library.notify("Config", "Failed to load", 2, "error") end
+        else Library.notify("Config", "No config selected", 2, "error") end
+    end },
+    { text = "Delete Config", hoverColor = Color3.fromRGB(235,70,70), callback = function()
+        if current_config == "" then Library.notify("Config", "No config selected", 2, "error"); return end
+        local target = current_config
+        Library.confirm("ARE YOU SURE?", "Delete: "..target, function()
+            if Library.config.delete(target) then
+                Library.notify("Config", "Deleted: "..target, 2, "success")
+                if current_config == target then selectConfig("") end
+            else Library.notify("Config", "Failed to delete", 2, "error") end
+        end)
+    end },
+})
+S:buttonRow(14, {
+    { text = "Refresh Configs", callback = function()
+        local cs = refreshConfigs()
+        Library.notify("Config", "Refreshed: "..#cs.." found.", 2, "info")
+        local exists = false
+        for _, n in ipairs(cs) do if n == current_config then exists = true; break end end
+        if not exists and current_config ~= "" then selectConfig("") end
+        cfgDropdown.refresh()
+    end },
+})
+S:toggle("auto_load_config", "Auto Load Config", 15, function(state)
+    persistAutoload()
+    if state and current_config ~= "" then Library.notify("Config", "Auto load: "..current_config, 2, "success")
+    elseif state then Library.notify("Config", "Auto load ON (select a config)", 2, "warn") end
+end)
+
+-- APPEARANCE
+S:section("APPEARANCE", 20)
+S:buttonRow(21, {
+    { text = "Pumpkin", hoverColor = Library.ORIGINAL_THEME.accent, callback = function() Library.setTheme(Library.ORIGINAL_THEME.accent); Library.notify("Theme", "Pumpkin", 2) end },
+    { text = "Witch", hoverColor = Color3.fromRGB(170,90,255), callback = function() Library.setTheme(Color3.fromRGB(170,90,255)); Library.notify("Theme", "Witch", 2) end },
+    { text = "Slime", hoverColor = Color3.fromRGB(120,230,70), callback = function() Library.setTheme(Color3.fromRGB(120,230,70)); Library.notify("Theme", "Slime", 2) end },
+    { text = "Blood", hoverColor = Color3.fromRGB(225,35,55), callback = function() Library.setTheme(Color3.fromRGB(225,35,55)); Library.notify("Theme", "Blood", 2) end },
+})
+
+-- COMBAT
+S:section("COMBAT", 30)
+S:toggle("auto_kill_hulk", "Auto Kill Hulk", 31, function(v)
+    Game.AutoKill.setEnabled(v)
+    Library.notify("Auto Kill Hulk", v and "Watching" or "Disabled", 2, v and "success" or "info")
+end)
+S:button("Kill Hulk Button", "rbxassetid://88060480140568", 32, function()
+    local ok = Game.Fling.fire()
+    Library.notify("Kill Hulk", ok and "Fling started" or "No Hulk", 2, ok and "success" or "warn")
+end)
+S:slider("fling_predict", "Kill Predict", -100, 100, 33, function(v) Game.Fling.predictOffset = v end)
+S:slider("fling_speed", "Speed Kill", 100, 1200, 34, function(v)
+    Game.Fling.linearForce = v; Game.Fling.spinForce = v * 30
+end)
+S:toggle("auto_punch", "Auto Punch (Hulk)", 35, function(v)
+    Game.AutoPunch.setEnabled(v)
+    Library.notify("Auto Punch", v and "ON" or "OFF", 2, v and "success" or "info")
+end)
+
+-- HULK ESP
+S:section("HULK ESP", 40)
+S:toggle("esp_hulk",       "ESP Hulk", 41, function(v) Game.PlayerESP.setFlag("hulk", v) end)
+S:toggle("esp_hulkbuster", "ESP Hulkbuster", 42, function(v) Game.PlayerESP.setFlag("hulkbuster", v) end)
+S:toggle("esp_survivor",   "ESP Survivor", 43, function(v) Game.PlayerESP.setFlag("survivor", v) end)
+S:toggle("esp_weapons",    "ESP Weapons", 44, function(v) Game.PlayerESP.setFlag("weapon", v) end)
+S:toggle("esp_ability",    "ESP Ability Owners", 45, function(v) Game.PlayerESP.setFlag("abilityHighlight", v) end)
+S:colorPicker("esp_color", "ESP Color", 46)
+S:toggle("esp_vents",   "ESP Vents", 47, function(v) if v then Game.EspVents.enable() else Game.EspVents.disable() end end)
+S:toggle("esp_cabinet", "ESP Cabinet", 48, function(v) if v then Game.EspCabinet.enable() else Game.EspCabinet.disable() end end)
+
+-- INTEL
+S:section("INTEL", 50)
+S:toggle("esp_hulk_chance", "ESP Hulk Probability + Pity", 51, function(v) if v then Game.ChanceESP.enable() else Game.ChanceESP.disable() end end)
+S:toggle("hulk_alert",      "Hulk Alert", 52, function(v) if v then Game.HulkAlert.enable() else Game.HulkAlert.disable() end end)
+S:toggle("live_event",      "Live Event", 53, function(v) if v then Game.EventLog.enable() else Game.EventLog.disable() end end)
+
+-- SURVIVOR
+S:section("SURVIVOR", 60)
+S:toggle("infinite_stamina", "Infinite Stamina", 61, function(v) if v then Game.InfiniteStamina.enable() else Game.InfiniteStamina.disable() end end)
+S:toggle("anti_ragdoll",     "Anti Ragdoll", 62, function(v) if v then Game.AntiRagdoll.enable() else Game.AntiRagdoll.disable() end end)
+S:toggle("jump_enabled",     "JumpPower", 63, function(v) Game.PlayerState.jumpEnabled = v; Game.applyPlayerState() end)
+S:slider("jump_value",       "JumpPower Value", 50, 500, 64, function(v) Game.PlayerState.jumpPower = v; if Game.PlayerState.jumpEnabled then Game.applyPlayerState() end end)
+S:toggle("tpwalk_enabled",   "Speed Power", 65, function(v) Game.PlayerState.speedPower = v end)
+S:slider("tp_speed",         "Speed Power Value", 1, 50, 66, function(v) Game.PlayerState.tpSpeed = v end)
+S:toggle("auto_escape", "Auto Escape", 67, function(v)
+    Game.Panic.setAuto(v)
+    Library.notify("Auto Escape", v and "Watching" or "Disabled", 2, v and "success" or "info")
+end)
+S:button("Escape Button", "rbxassetid://88060480140568", 68, function()
+    local ok = Game.Panic.fireManual()
+    Library.notify("Escape", ok and "Teleported" or "No spot", 2, ok and "success" or "warn")
+end)
+
+-- AUTOMATION
+S:section("AUTOMATION", 70)
+S:toggle("auto_mission", "Auto Mission", 71, function(v) Game.AutoMission.setEnabled(v) end)
+S:toggle("anti_debris",  "Anti Debris", 72, function(v) if v then Game.AntiDebris.enable() else Game.AntiDebris.disable() end end)
+S:toggle("remove_doors", "Remove Doors", 73, function(v) if v then Game.Doors.enable() else Game.Doors.disable() end end)
+
+Win.boot()
+
+task.delay(0.5, function()
+    for _, k in ipairs(HULK_KEYS) do
+        local v = Library.options[k]
+        if v ~= nil and Library.registry[k] then
+            pcall(Library.registry[k], v)
+        end
+    end
+end)
+
+do
+    local al = Library.config.readAutoload()
+    if al and al.enabled == true and type(al.config) == "string" and al.config ~= "" then
+        Library.setOption("auto_load_config", true)
+        Library.setOption("last_selected_config", al.config)
+        current_config = al.config
+        if Library.registry["auto_load_config"] then Library.registry["auto_load_config"](true) end
+        cfgDropdown.refresh()
+        task.delay(0.9, function()
+            local data = Library.config.load(al.config)
+            if data then
+                local applied = Library.deserialize(data)
+                for k, _ in pairs(applied) do
+                    if Library.registry[k] then pcall(Library.registry[k], Library.options[k]) end
+                end
+                Library.notify("Config", "Auto-Loaded: "..al.config, 2, "success")
+            end
+        end)
+    end
+end
+
+print("[Babis UI] Halloween Edition — Settings only. Library loaded.")
