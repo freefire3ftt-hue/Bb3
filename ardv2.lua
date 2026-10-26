@@ -1,15 +1,6 @@
---[[ ============================================================
-     ardv2.lua — Library + Hulk options (Settings only)
-     Sem WebShotCam. Sem som, sem morcego, sem neblina.
-     [1] Library completa — não mexer.
-     [2] BACKEND — cola teu `local Game = (function()...end)()`
-         v2.8 puro dentro do marker.
-     [3] App — monta a página Settings com todas as opções do Hulk.
-     ============================================================ ]]
+-- language: Lua, file: library.lua
+-- Library (Halloween UI) — métodos do page com `:` (self). Pronta pra colar.
 
--- ╔══════════════════════════════════════════════════════════╗
--- ║ [1] LIBRARY                                              ║
--- ╚══════════════════════════════════════════════════════════╝
 local Library = (function()
 
 local Players          = game:GetService("Players")
@@ -926,7 +917,7 @@ local function newWindow(opts)
 
     local page = { _frame = pageFrame }
 
-    function page.section(text, order)
+    function page:section(text, order)
         local wrap = new("Frame", { Size = UDim2.new(1,0,0,26), BackgroundTransparency = 1, LayoutOrder = order, Parent = pageFrame })
         local dot = new("Frame", { Size = UDim2.fromOffset(4,12), Position = UDim2.new(0,2,0,3), BackgroundColor3 = Theme.c.accent, BorderSizePixel = 0, Parent = wrap })
         corner(dot, 2); Theme.bind(dot, "BackgroundColor3", "accent")
@@ -936,7 +927,7 @@ local function newWindow(opts)
         new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0,0.5), NumberSequenceKeypoint.new(1,1) }), Parent = line })
     end
 
-    function page.button(label, icon, order, cb)
+    function page:button(label, icon, order, cb)
         local _, card, st, bar = cardBase(pageFrame, CARD_H, order, true)
         local hover = false
         newLabel(card, label, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1,-90,1,0), Position = UDim2.new(0,16,0,0) })
@@ -955,7 +946,7 @@ local function newWindow(opts)
         card.MouseButton1Click:Connect(function() if cb then cb(card) end end)
     end
 
-    function page.toggle(key, label, order, cb)
+    function page:toggle(key, label, order, cb)
         local state = Options[key] == true
         local _, card, st, bar = cardBase(pageFrame, CARD_H, order, true)
         local hover = false
@@ -990,11 +981,11 @@ local function newWindow(opts)
         end)
     end
 
-    function page.slider(key, label, minV, maxV, order, cb)
+    function page:slider(key, label, minV, maxV, order, cb)
         minV = minV or 0; maxV = maxV or 100
         local value = math.clamp(math.floor((tonumber(Options[key]) or minV) + 0.5), minV, maxV)
         local _, card, st, bar = cardBase(pageFrame, 58, order, false)
-        local hover, dragging = false, false
+        local hover, dragging2 = false, false
         newLabel(card, label, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1,-110,0,20), Position = UDim2.new(0,16,0,8) })
         local numBox = new("TextBox", { Size = UDim2.fromOffset(62,24), Position = UDim2.new(1,-78,0,6), BackgroundColor3 = Theme.c.bgMain, Text = tostring(value),
             TextColor3 = Theme.c.accent, TextSize = 12, Font = FONT_STRONG, BorderSizePixel = 0, TextXAlignment = Enum.TextXAlignment.Center, ClearTextOnFocus = false, ZIndex = 3, Parent = card })
@@ -1010,9 +1001,9 @@ local function newWindow(opts)
         corner(knob, 7); stroke(knob, Theme.c.accent, 2, 0)
         local function render(a)
             local c = Theme.c; local d = a and 0.18 or 0
-            apply(card, { BackgroundColor3 = (hover or dragging) and c.hover or c.bgCard }, d)
-            apply(st, { Color = (hover or dragging) and c.border:Lerp(c.accent,0.4) or c.border }, d)
-            apply(bar, { Size = UDim2.new(0,3,dragging and 0.55 or 0,0) }, d, Enum.EasingStyle.Back)
+            apply(card, { BackgroundColor3 = (hover or dragging2) and c.hover or c.bgCard }, d)
+            apply(st, { Color = (hover or dragging2) and c.border:Lerp(c.accent,0.4) or c.border }, d)
+            apply(bar, { Size = UDim2.new(0,3,dragging2 and 0.55 or 0,0) }, d, Enum.EasingStyle.Back)
             fillGrad.Color = ColorSequence.new(c.accent, c.glow)
         end
         Theme.reg(card, function(_, a) render(a) end)
@@ -1033,15 +1024,15 @@ local function newWindow(opts)
         end
         hit.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true; setScrolling(false); render(true); fromX(input.Position.X)
+                dragging2 = true; setScrolling(false); render(true); fromX(input.Position.X)
             end
         end)
         bind(UserInputService.InputChanged, function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then fromX(input.Position.X) end
+            if dragging2 and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then fromX(input.Position.X) end
         end)
         bind(UserInputService.InputEnded, function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-                dragging = false; setScrolling(true); render(true)
+            if dragging2 and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                dragging2 = false; setScrolling(true); render(true)
             end
         end)
         numBox.FocusLost:Connect(function()
@@ -1054,7 +1045,7 @@ local function newWindow(opts)
         card.MouseLeave:Connect(function() hover = false render(true) end)
     end
 
-    function page.textbox(key, label, order, cb, placeholder)
+    function page:textbox(key, label, order, cb, placeholder)
         local initText = key and tostring(Options[key] or "") or ""
         local _, card = cardBase(pageFrame, CARD_H, order, false)
         newLabel(card, label, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1,-170,1,0), Position = UDim2.new(0,16,0,0) })
@@ -1069,7 +1060,7 @@ local function newWindow(opts)
         return box
     end
 
-    function page.dropdown(label, order, spec)
+    function page:dropdown(label, order, spec)
         local _, card, st, bar = cardBase(pageFrame, CARD_H+4, order, true)
         local hover = false
         newLabel(card, label, 13, FONT_STRONG, TEXT, { Size = UDim2.new(1,-170,1,0), Position = UDim2.new(0,16,0,0) })
@@ -1102,7 +1093,7 @@ local function newWindow(opts)
         return obj
     end
 
-    function page.colorPicker(key, label, order)
+    function page:colorPicker(key, label, order)
         local EXPANDED_H = CARD_H + 168
         local wrap, card, st, bar = cardBase(pageFrame, CARD_H, order, false)
         local hover = false
@@ -1192,7 +1183,7 @@ local function newWindow(opts)
         rowHit.MouseLeave:Connect(function() hover = false render(true) end)
     end
 
-    function page.buttonRow(order, defs)
+    function page:buttonRow(order, defs)
         local wrap = new("Frame", { Size = UDim2.new(1,0,0,36), BackgroundTransparency = 1, LayoutOrder = order, Parent = pageFrame })
         wrap:SetAttribute("Entrance", true)
         local row = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Parent = wrap })
@@ -1298,245 +1289,3 @@ return {
 }
 
 end)()
--- ╚══════════════════ END LIBRARY ══════════════════╝
-
--- ╔══════════════════════════════════════════════════════════╗
--- ║ [2] BACKEND — COLA TEU v2.8 AQUI                         ║
--- ║                                                          ║
--- ║ Substitui o bloco stub inteiro pelo `local Game =         ║
--- ║ (function() ... end)()` do teu ardv2.lua v2.8.            ║
--- ║                                                          ║
--- ║ Se quiser testar só a UI primeiro, deixa o stub — os      ║
--- ║ toggles vão clicar/animar mas não vão chamar nada no jogo.║
--- ╚══════════════════════════════════════════════════════════╝
-local Game = (function()
-    local noop = function() end
-    local noopFalse = function() return false end
-    return {
-        AutoKill        = { setEnabled = noop },
-        Fling           = { fire = noopFalse, predictOffset = 1, linearForce = 400, spinForce = 12000 },
-        PlayerESP       = { setFlag = noop },
-        ChanceESP       = { enable = noop, disable = noop },
-        EspVents        = { enable = noop, disable = noop },
-        EspCabinet      = { enable = noop, disable = noop },
-        AntiDebris      = { enable = noop, disable = noop },
-        EventLog        = { enable = noop, disable = noop },
-        HulkAlert       = { enable = noop, disable = noop },
-        Panic           = { setAuto = noop, fireManual = noopFalse },
-        InfiniteStamina = { enable = noop, disable = noop },
-        AntiRagdoll     = { enable = noop, disable = noop },
-        PlayerState     = { jumpEnabled = false, speedPower = false, jumpPower = 50, tpSpeed = 3 },
-        applyPlayerState = noop,
-        AutoPunch       = { setEnabled = noop },
-        AutoMission     = { setEnabled = noop },
-        SpinSystem      = { setEnabled = noop },
-        Doors           = { enable = noop, disable = noop },
-    }
-end)()
-
--- ╔══════════════════════════════════════════════════════════╗
--- ║ [3] APP — Settings page com todas as opções do Hulk      ║
--- ╚══════════════════════════════════════════════════════════╝
-
-local HULK_KEYS = {
-    "auto_kill_hulk", "fling_predict", "fling_speed", "auto_punch",
-    "esp_hulk", "esp_hulkbuster", "esp_survivor", "esp_weapons", "esp_ability",
-    "esp_vents", "esp_cabinet", "esp_hulk_chance", "hulk_alert", "live_event",
-    "infinite_stamina", "anti_ragdoll", "jump_enabled", "jump_value",
-    "tpwalk_enabled", "tp_speed", "auto_escape",
-    "auto_mission", "anti_debris", "remove_doors",
-}
-do
-    local merged = {}
-    for _, k in ipairs(Library.persistKeys) do merged[#merged+1] = k end
-    for _, k in ipairs(HULK_KEYS) do merged[#merged+1] = k end
-    Library.setPersistKeys(merged)
-end
-
-local Win = Library.newWindow({ subtitle = "Survive The Hulk", premium = "Halloween Edition" })
-local S = Win.settings
-
--- CONFIGURATION
-S:section("CONFIGURATION", 0)
-local nameBox = S:textbox(nil, "Config Name", 10, nil, "Enter preset name...")
-local current_config = tostring(Library.options.last_selected_config or "")
-local cfgDropdown
-local function refreshConfigs() return Library.config.list() end
-local function persistAutoload()
-    if Library.options.auto_load_config and current_config ~= "" then
-        Library.config.writeAutoload(true, current_config)
-    else
-        Library.config.writeAutoload(false, current_config)
-    end
-end
-local function selectConfig(name)
-    current_config = name or ""
-    Library.setOption("last_selected_config", current_config)
-    if cfgDropdown then cfgDropdown.refresh() end
-    if Library.options.auto_load_config then persistAutoload() end
-end
-cfgDropdown = S:dropdown("Selected Config", 11, {
-    header = "Configs",
-    getOptions = refreshConfigs,
-    get = function() return current_config end,
-    set = function(name) selectConfig(name) end,
-    empty = "No configs found",
-})
-S:buttonRow(12, {
-    { text = "Create Config", callback = function()
-        local name = Library.config.sanitize(nameBox.Text)
-        if name == "" then Library.notify("Config", "Enter a name first", 2, "error"); return end
-        if Library.config.exists(name) then Library.notify("Config", "Already exists: "..name, 2.5, "warn"); return end
-        if Library.config.save(name, Library.serialize()) then
-            nameBox.Text = ""; Library.notify("Config", "Created: "..name, 2, "success"); selectConfig(name)
-        else Library.notify("Config", "Failed to create", 2, "error") end
-    end },
-    { text = "Save Config", callback = function()
-        if current_config ~= "" then
-            if Library.config.save(current_config, Library.serialize()) then
-                Library.notify("Config", "Saved: "..current_config, 2, "success")
-            else Library.notify("Config", "Failed to save", 2, "error") end
-        else Library.notify("Config", "No config selected", 2, "error") end
-    end },
-})
-S:buttonRow(13, {
-    { text = "Load Config", callback = function()
-        if current_config ~= "" then
-            local data = Library.config.load(current_config)
-            if data then
-                local applied = Library.deserialize(data)
-                for k, _ in pairs(applied) do
-                    if Library.registry[k] then pcall(Library.registry[k], Library.options[k]) end
-                end
-                Library.notify("Config", "Loaded: "..current_config, 2, "success")
-            else Library.notify("Config", "Failed to load", 2, "error") end
-        else Library.notify("Config", "No config selected", 2, "error") end
-    end },
-    { text = "Delete Config", hoverColor = Color3.fromRGB(235,70,70), callback = function()
-        if current_config == "" then Library.notify("Config", "No config selected", 2, "error"); return end
-        local target = current_config
-        Library.confirm("ARE YOU SURE?", "Delete: "..target, function()
-            if Library.config.delete(target) then
-                Library.notify("Config", "Deleted: "..target, 2, "success")
-                if current_config == target then selectConfig("") end
-            else Library.notify("Config", "Failed to delete", 2, "error") end
-        end)
-    end },
-})
-S:buttonRow(14, {
-    { text = "Refresh Configs", callback = function()
-        local cs = refreshConfigs()
-        Library.notify("Config", "Refreshed: "..#cs.." found.", 2, "info")
-        local exists = false
-        for _, n in ipairs(cs) do if n == current_config then exists = true; break end end
-        if not exists and current_config ~= "" then selectConfig("") end
-        cfgDropdown.refresh()
-    end },
-})
-S:toggle("auto_load_config", "Auto Load Config", 15, function(state)
-    persistAutoload()
-    if state and current_config ~= "" then Library.notify("Config", "Auto load: "..current_config, 2, "success")
-    elseif state then Library.notify("Config", "Auto load ON (select a config)", 2, "warn") end
-end)
-
--- APPEARANCE
-S:section("APPEARANCE", 20)
-S:buttonRow(21, {
-    { text = "Pumpkin", hoverColor = Library.ORIGINAL_THEME.accent, callback = function() Library.setTheme(Library.ORIGINAL_THEME.accent); Library.notify("Theme", "Pumpkin", 2) end },
-    { text = "Witch", hoverColor = Color3.fromRGB(170,90,255), callback = function() Library.setTheme(Color3.fromRGB(170,90,255)); Library.notify("Theme", "Witch", 2) end },
-    { text = "Slime", hoverColor = Color3.fromRGB(120,230,70), callback = function() Library.setTheme(Color3.fromRGB(120,230,70)); Library.notify("Theme", "Slime", 2) end },
-    { text = "Blood", hoverColor = Color3.fromRGB(225,35,55), callback = function() Library.setTheme(Color3.fromRGB(225,35,55)); Library.notify("Theme", "Blood", 2) end },
-})
-
--- COMBAT
-S:section("COMBAT", 30)
-S:toggle("auto_kill_hulk", "Auto Kill Hulk", 31, function(v)
-    Game.AutoKill.setEnabled(v)
-    Library.notify("Auto Kill Hulk", v and "Watching" or "Disabled", 2, v and "success" or "info")
-end)
-S:button("Kill Hulk Button", "rbxassetid://88060480140568", 32, function()
-    local ok = Game.Fling.fire()
-    Library.notify("Kill Hulk", ok and "Fling started" or "No Hulk", 2, ok and "success" or "warn")
-end)
-S:slider("fling_predict", "Kill Predict", -100, 100, 33, function(v) Game.Fling.predictOffset = v end)
-S:slider("fling_speed", "Speed Kill", 100, 1200, 34, function(v)
-    Game.Fling.linearForce = v; Game.Fling.spinForce = v * 30
-end)
-S:toggle("auto_punch", "Auto Punch (Hulk)", 35, function(v)
-    Game.AutoPunch.setEnabled(v)
-    Library.notify("Auto Punch", v and "ON" or "OFF", 2, v and "success" or "info")
-end)
-
--- HULK ESP
-S:section("HULK ESP", 40)
-S:toggle("esp_hulk",       "ESP Hulk", 41, function(v) Game.PlayerESP.setFlag("hulk", v) end)
-S:toggle("esp_hulkbuster", "ESP Hulkbuster", 42, function(v) Game.PlayerESP.setFlag("hulkbuster", v) end)
-S:toggle("esp_survivor",   "ESP Survivor", 43, function(v) Game.PlayerESP.setFlag("survivor", v) end)
-S:toggle("esp_weapons",    "ESP Weapons", 44, function(v) Game.PlayerESP.setFlag("weapon", v) end)
-S:toggle("esp_ability",    "ESP Ability Owners", 45, function(v) Game.PlayerESP.setFlag("abilityHighlight", v) end)
-S:colorPicker("esp_color", "ESP Color", 46)
-S:toggle("esp_vents",   "ESP Vents", 47, function(v) if v then Game.EspVents.enable() else Game.EspVents.disable() end end)
-S:toggle("esp_cabinet", "ESP Cabinet", 48, function(v) if v then Game.EspCabinet.enable() else Game.EspCabinet.disable() end end)
-
--- INTEL
-S:section("INTEL", 50)
-S:toggle("esp_hulk_chance", "ESP Hulk Probability + Pity", 51, function(v) if v then Game.ChanceESP.enable() else Game.ChanceESP.disable() end end)
-S:toggle("hulk_alert",      "Hulk Alert", 52, function(v) if v then Game.HulkAlert.enable() else Game.HulkAlert.disable() end end)
-S:toggle("live_event",      "Live Event", 53, function(v) if v then Game.EventLog.enable() else Game.EventLog.disable() end end)
-
--- SURVIVOR
-S:section("SURVIVOR", 60)
-S:toggle("infinite_stamina", "Infinite Stamina", 61, function(v) if v then Game.InfiniteStamina.enable() else Game.InfiniteStamina.disable() end end)
-S:toggle("anti_ragdoll",     "Anti Ragdoll", 62, function(v) if v then Game.AntiRagdoll.enable() else Game.AntiRagdoll.disable() end end)
-S:toggle("jump_enabled",     "JumpPower", 63, function(v) Game.PlayerState.jumpEnabled = v; Game.applyPlayerState() end)
-S:slider("jump_value",       "JumpPower Value", 50, 500, 64, function(v) Game.PlayerState.jumpPower = v; if Game.PlayerState.jumpEnabled then Game.applyPlayerState() end end)
-S:toggle("tpwalk_enabled",   "Speed Power", 65, function(v) Game.PlayerState.speedPower = v end)
-S:slider("tp_speed",         "Speed Power Value", 1, 50, 66, function(v) Game.PlayerState.tpSpeed = v end)
-S:toggle("auto_escape", "Auto Escape", 67, function(v)
-    Game.Panic.setAuto(v)
-    Library.notify("Auto Escape", v and "Watching" or "Disabled", 2, v and "success" or "info")
-end)
-S:button("Escape Button", "rbxassetid://88060480140568", 68, function()
-    local ok = Game.Panic.fireManual()
-    Library.notify("Escape", ok and "Teleported" or "No spot", 2, ok and "success" or "warn")
-end)
-
--- AUTOMATION
-S:section("AUTOMATION", 70)
-S:toggle("auto_mission", "Auto Mission", 71, function(v) Game.AutoMission.setEnabled(v) end)
-S:toggle("anti_debris",  "Anti Debris", 72, function(v) if v then Game.AntiDebris.enable() else Game.AntiDebris.disable() end end)
-S:toggle("remove_doors", "Remove Doors", 73, function(v) if v then Game.Doors.enable() else Game.Doors.disable() end end)
-
-Win.boot()
-
-task.delay(0.5, function()
-    for _, k in ipairs(HULK_KEYS) do
-        local v = Library.options[k]
-        if v ~= nil and Library.registry[k] then
-            pcall(Library.registry[k], v)
-        end
-    end
-end)
-
-do
-    local al = Library.config.readAutoload()
-    if al and al.enabled == true and type(al.config) == "string" and al.config ~= "" then
-        Library.setOption("auto_load_config", true)
-        Library.setOption("last_selected_config", al.config)
-        current_config = al.config
-        if Library.registry["auto_load_config"] then Library.registry["auto_load_config"](true) end
-        cfgDropdown.refresh()
-        task.delay(0.9, function()
-            local data = Library.config.load(al.config)
-            if data then
-                local applied = Library.deserialize(data)
-                for k, _ in pairs(applied) do
-                    if Library.registry[k] then pcall(Library.registry[k], Library.options[k]) end
-                end
-                Library.notify("Config", "Auto-Loaded: "..al.config, 2, "success")
-            end
-        end)
-    end
-end
-
-print("[Babis UI] Halloween Edition — Settings only. Library loaded.")
